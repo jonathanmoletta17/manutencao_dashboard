@@ -7,6 +7,15 @@ export interface MaintenanceGeneralStats {
   resolvidos: number;
 }
 
+export interface MaintenanceStatusTotals {
+  novos: number;
+  nao_solucionados: number;
+  planejados: number;
+  solucionados: number;
+  fechados: number;
+  resolvidos: number;
+}
+
 export interface EntityRankingItem {
   entity_name: string;
   ticket_count: number;

@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import MaintenanceDashboard from "./MaintenanceDashboard";
-import "./index.css";
+import "./dtic-index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

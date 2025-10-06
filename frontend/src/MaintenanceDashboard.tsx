@@ -19,12 +19,14 @@ import { Badge } from "./components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { 
   fetchMaintenanceGeneralStats, 
+  fetchMaintenanceStatusTotals,
   fetchEntityRanking, 
   fetchCategoryRanking,
   fetchMaintenanceNewTickets
 } from './services/maintenance-api';
 import type { 
   MaintenanceGeneralStats, 
+  MaintenanceStatusTotals,
   EntityRankingItem, 
   CategoryRankingItem,
   MaintenanceNewTicketItem 
@@ -33,6 +35,7 @@ import { DateRangePicker } from './components/DateRangePicker';
 
 export default function MaintenanceDashboard() {
   const [generalStats, setGeneralStats] = useState<MaintenanceGeneralStats | null>(null);
+  const [statusTotals, setStatusTotals] = useState<MaintenanceStatusTotals | null>(null);
   const [entityRanking, setEntityRanking] = useState<EntityRankingItem[] | null>(null);
   const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
   const [newTickets, setNewTickets] = useState<MaintenanceNewTicketItem[] | null>(null);
@@ -63,6 +66,14 @@ export default function MaintenanceDashboard() {
   };
 
   const loadDashboardDataWith = async (inicio: string, fim: string) => {
+    // Totais gerais por status (sem filtro de data)
+    try {
+      const st = await fetchMaintenanceStatusTotals();
+      setStatusTotals(st);
+    } catch (err) {
+      console.error('Falha ao buscar Status Totais:', err);
+    }
+
     try {
       const gs = await fetchMaintenanceGeneralStats(inicio, fim);
       setGeneralStats(gs);
@@ -158,14 +169,14 @@ export default function MaintenanceDashboard() {
 
       {/* Content - Layout otimizado para tela cheia */}
       <div className="p-4 h-[calc(100vh-64px)] flex flex-col gap-3">
-        {/* Stats Cards - Linha superior */}
+        {/* Stats Cards - Linha superior (período) */}
         <div className="grid grid-cols-4 gap-3">
           <Card className="bg-white border-l-4 border-l-[#5A9BD4] shadow-sm">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Novos</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.novos)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.novos)}</p>
                 </div>
                 <div className="w-9 h-9 bg-[#5A9BD4]/10 rounded-lg flex items-center justify-center">
                   <TrendingUp className="w-4 h-4 text-[#5A9BD4]" />
@@ -179,7 +190,7 @@ export default function MaintenanceDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Pendentes</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.pendentes)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.nao_solucionados)}</p>
                 </div>
                 <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
                   <Clock className="w-4 h-4 text-amber-600" />
@@ -193,7 +204,7 @@ export default function MaintenanceDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Planejados</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.planejados)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.planejados)}</p>
                 </div>
                 <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Clock className="w-4 h-4 text-purple-600" />
@@ -207,7 +218,7 @@ export default function MaintenanceDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Resolvidos</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.resolvidos)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.resolvidos)}</p>
                 </div>
                 <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
                   <CheckCircle className="w-4 h-4 text-green-600" />
