@@ -9,8 +9,11 @@ import time
 from typing import Any, Dict, List, Optional
 
 import requests
+import logging
 
 from .logic.errors import GLPIAuthError, GLPINetworkError, GLPISearchError
+
+logger = logging.getLogger(__name__)
 
 # Cache leve de sessão (reuso de Session-Token por TTL curto)
 _SESSION_HEADERS: Optional[Dict[str, str]] = None
@@ -137,6 +140,9 @@ def search_paginated(
             current_params = params.copy()
             current_params['range'] = f"{start}-{start + range_step - 1}"
             
+            # Log detalhado da requisição ao GLPI
+            logger.debug("GLPI search GET %s itemtype=%s params=%s", search_url, itemtype, current_params)
+
             response = requests.get(search_url, headers=headers, params=current_params, timeout=(3, 6))
             response.raise_for_status()
             
@@ -161,6 +167,13 @@ def search_paginated(
         raise GLPINetworkError(f"Timeout na busca paginada de {itemtype}", timeout=True)
     except requests.exceptions.HTTPError as e:
         status = getattr(e.response, 'status_code', None)
+        body = ''
+        try:
+            body = getattr(e.response, 'text', '')
+        except Exception:
+            body = ''
+        # Log detalhado do erro HTTP retornado pelo GLPI
+        logger.error("GLPI HTTP error itemtype=%s status=%s body=%s", itemtype, status, body)
         if status in (401, 403):
             raise GLPIAuthError("Falha de autenticação GLPI", status_code=status)
         raise GLPISearchError(f"Erro HTTP na busca paginada de {itemtype} (status={status})", status_code=status)

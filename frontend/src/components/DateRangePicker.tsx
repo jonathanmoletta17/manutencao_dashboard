@@ -22,6 +22,7 @@ export function DateRangePicker({ value, onChange, onApply, className }: Props) 
         <span className="text-xs text-white/80">Início</span>
         <Input
           type="date"
+          lang="pt-BR"
           value={value.inicio}
           onChange={(e) => onChange({ ...value, inicio: e.target.value })}
           className="bg-transparent border-none text-white placeholder:text-white/70"
@@ -31,6 +32,7 @@ export function DateRangePicker({ value, onChange, onApply, className }: Props) 
         <span className="text-xs text-white/80">Fim</span>
         <Input
           type="date"
+          lang="pt-BR"
           value={value.fim}
           onChange={(e) => onChange({ ...value, fim: e.target.value })}
           className="bg-transparent border-none text-white placeholder:text-white/70"

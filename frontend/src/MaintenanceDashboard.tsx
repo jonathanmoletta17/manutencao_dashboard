@@ -19,17 +19,13 @@ import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { 
-  fetchMaintenanceGeneralStats, 
-  fetchMaintenanceStatusTotals,
-  fetchEntityRanking, 
-  fetchCategoryRanking,
+  fetchMaintenanceGeneralStats,
   fetchMaintenanceNewTickets,
-  fetchTopEntityAttribution,
-  fetchTopCategoryAttribution
+  fetchEntityRanking,
+  fetchCategoryRanking
 } from './services/maintenance-api';
 import type { 
-  MaintenanceGeneralStats, 
-  MaintenanceStatusTotals,
+  MaintenanceGeneralStats,
   EntityRankingItem, 
   CategoryRankingItem,
   MaintenanceNewTicketItem 
@@ -38,11 +34,11 @@ import { DateRangePicker } from './components/DateRangePicker';
 
 export default function MaintenanceDashboard() {
   const [generalStats, setGeneralStats] = useState<MaintenanceGeneralStats | null>(null);
-  const [statusTotals, setStatusTotals] = useState<MaintenanceStatusTotals | null>(null);
   const [entityRanking, setEntityRanking] = useState<EntityRankingItem[] | null>(null);
   const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
   const [newTickets, setNewTickets] = useState<MaintenanceNewTicketItem[] | null>(null);
   const [time, setTime] = useState<Date>(new Date());
+  const [topN, setTopN] = useState<number>(5);
   const [dateRange, setDateRange] = useState<{ inicio: string; fim: string }>(() => {
     const toYmd = (d: Date) => d.toISOString().slice(0, 10);
     const now = new Date();
@@ -54,48 +50,69 @@ export default function MaintenanceDashboard() {
 
   const refreshInFlight = useRef(false);
   const dateRangeRef = useRef(dateRange);
+  const topNRef = useRef(topN);
   
   useEffect(() => {
     dateRangeRef.current = dateRange;
   }, [dateRange]);
+
+  useEffect(() => {
+    topNRef.current = topN;
+  }, [topN]);
 
   const fmt = (n: number | undefined | null) =>
     n !== undefined && n !== null
       ? new Intl.NumberFormat('pt-BR').format(n)
       : '-';
 
+  // Remove o prefixo do pai "Origem > PIRATINI" quando a entidade não é exatamente o pai
+  const stripParentPrefix = (name: string) => {
+    const PARENT = 'Origem > PIRATINI';
+    const s = (name || '').trim();
+    const norm = s.replace(/\s*>\s*/g, ' > ');
+    const lower = norm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const parentLower = PARENT.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (lower === parentLower) return s;
+    if (lower.startsWith(parentLower + ' > ')) return norm.slice(PARENT.length + 3).trim();
+    return s;
+  };
+
   const applyDateRange = () => {
     loadDashboardData();
   };
 
-  const loadDashboardDataWith = async (inicio: string, fim: string) => {
-    // Totais gerais por status (sem filtro de data)
+  const loadDashboardDataWith = async (inicio?: string, fim?: string) => {
+    // Stats gerais por período
     try {
-      const st = await fetchMaintenanceStatusTotals();
-      setStatusTotals(st);
-    } catch (err) {
-      console.error('Falha ao buscar Status Totais:', err);
-    }
-
-    try {
-      const gs = await fetchMaintenanceGeneralStats(inicio, fim);
+      const inRange = inicio ?? dateRangeRef.current.inicio;
+      const endRange = fim ?? dateRangeRef.current.fim;
+      const gs = await fetchMaintenanceGeneralStats(inRange, endRange);
       setGeneralStats(gs);
     } catch (err) {
       console.error('Falha ao buscar Estatísticas Gerais:', err);
     }
 
+    // Ranking por entidades filtrado por período (como stats gerais)
     try {
-      const er = await fetchTopEntityAttribution(5);
+      const inRange = inicio ?? dateRangeRef.current.inicio;
+      const endRange = fim ?? dateRangeRef.current.fim;
+      const topParam = topNRef.current;
+      const er = await fetchEntityRanking(inRange, endRange, topParam);
       setEntityRanking(er);
     } catch (err) {
-      console.error('Falha ao buscar Ranking de Entidades (Top atribuição global):', err);
+      console.error('Falha ao buscar Ranking de Entidades (por período):', err);
     }
 
+    // Ranking por categorias filtrado por período
+    // Para garantir itens suficientes em cada macro área, buscamos 3x TopN
     try {
-      const cr = await fetchTopCategoryAttribution(50);
+      const inRange = inicio ?? dateRangeRef.current.inicio;
+      const endRange = fim ?? dateRangeRef.current.fim;
+      const topParam = topNRef.current;
+      const cr = await fetchCategoryRanking(inRange, endRange, Math.max(topParam * 3, 15));
       setCategoryRanking(cr);
     } catch (err) {
-      console.error('Falha ao buscar Ranking de Categorias (Top atribuição global):', err);
+      console.error('Falha ao buscar Ranking de Categorias (por período):', err);
     }
 
     try {
@@ -115,9 +132,21 @@ export default function MaintenanceDashboard() {
     loadDashboardData();
   }, []);
 
-  // Polling de 15s
+  // Atualizar dados quando Top N mudar
   useEffect(() => {
-    const intervalMs = Number(import.meta.env.VITE_REALTIME_POLL_INTERVAL_SEC ?? 15000);
+    const { inicio, fim } = dateRangeRef.current;
+    loadDashboardDataWith(inicio, fim);
+  }, [topN]);
+
+  // Polling configurável via .env
+  useEffect(() => {
+    const rawPollMs = (import.meta as any)?.env?.VITE_REALTIME_POLL_INTERVAL_MS;
+    const rawPollSec = (import.meta as any)?.env?.VITE_REALTIME_POLL_INTERVAL_SEC;
+    const intervalMs = rawPollMs !== undefined
+      ? Number(rawPollMs)
+      : rawPollSec !== undefined
+        ? Number(rawPollSec) * 1000
+        : 15000;
     const id = setInterval(async () => {
       if (refreshInFlight.current) return;
       refreshInFlight.current = true;
@@ -168,7 +197,13 @@ export default function MaintenanceDashboard() {
   const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação' | 'Outros'>('Manutenção');
 
   useEffect(() => {
-    const intervalMs = Number(import.meta.env.VITE_CATEGORY_CAROUSEL_INTERVAL_SEC ?? 15000);
+    const rawCarouselMs = (import.meta as any)?.env?.VITE_CATEGORY_CAROUSEL_INTERVAL_MS;
+    const rawCarouselSec = (import.meta as any)?.env?.VITE_CATEGORY_CAROUSEL_INTERVAL_SEC;
+    const intervalMs = rawCarouselMs !== undefined
+      ? Number(rawCarouselMs)
+      : rawCarouselSec !== undefined
+        ? Number(rawCarouselSec) * 1000
+        : 15000;
     const id = setInterval(() => {
       setCurrentCategoryArea((prev) => (prev === 'Manutenção' ? 'Conservação' : (prev === 'Conservação' ? 'Outros' : 'Manutenção')));
     }, intervalMs);
@@ -197,6 +232,20 @@ export default function MaintenanceDashboard() {
           <Button variant="ghost" size="sm" className="text-white hover:bg-blue-600" onClick={loadDashboardData}>
             <RotateCcw className="w-4 h-4" />
           </Button>
+          {/* Seletor Top N */}
+          <div className="flex items-center gap-2 px-2 border-l border-white/20">
+            <label className="text-sm text-blue-100">Top N</label>
+            <select
+              className="text-sm bg-white/20 text-white rounded px-2 py-1 focus:outline-none"
+              value={topN}
+              onChange={(e) => setTopN(Number(e.target.value))}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
           <div className="flex items-center gap-3 pl-4 border-l border-white/20">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
               <User className="w-4 h-4 text-white" />
@@ -209,18 +258,18 @@ export default function MaintenanceDashboard() {
       </header>
 
       {/* Content - Layout otimizado para tela cheia */}
-      <div className="p-4 h-[calc(100vh-64px)] flex flex-col gap-3">
-        {/* Stats Cards - Linha superior (período) */}
+      <div className="p-6 h-[calc(100vh-64px)] flex flex-col gap-4 overflow-hidden">
+        {/* Stats Gerais - Linha superior (período selecionado) */}
         <div className="grid grid-cols-4 gap-3">
           <Card className="bg-white border-l-4 border-l-[#5A9BD4] shadow-sm">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Novos</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.novos)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.novos)}</p>
                 </div>
-                <div className="w-9 h-9 bg-[#5A9BD4]/10 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-[#5A9BD4]" />
+                <div className="w-10 h-10 p-1 bg-[#5A9BD4]/10 rounded-xl flex items-center justify-center shrink-0">
+                  <TrendingUp className="w-5 h-5 text-[#5A9BD4]" />
                 </div>
               </div>
             </CardContent>
@@ -231,10 +280,10 @@ export default function MaintenanceDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Pendentes</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.nao_solucionados)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.pendentes)}</p>
                 </div>
-                <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
-                  <Clock className="w-4 h-4 text-amber-600" />
+                <div className="w-10 h-10 p-1 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-amber-600" />
                 </div>
               </div>
             </CardContent>
@@ -245,10 +294,10 @@ export default function MaintenanceDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Planejados</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.planejados)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.planejados)}</p>
                 </div>
-                <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Clock className="w-4 h-4 text-purple-600" />
+                <div className="w-10 h-10 p-1 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-purple-600" />
                 </div>
               </div>
             </CardContent>
@@ -259,10 +308,10 @@ export default function MaintenanceDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Resolvidos</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.resolvidos)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.resolvidos)}</p>
                 </div>
-                <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
+                <div className="w-10 h-10 p-1 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
                 </div>
               </div>
             </CardContent>
@@ -270,99 +319,119 @@ export default function MaintenanceDashboard() {
         </div>
 
         {/* Main Content - 2 colunas */}
-        <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
-          {/* Coluna Esquerda - Rankings */}
-          <div className="flex flex-col gap-3 min-h-0">
+        <div className="flex gap-4 flex-1 min-h-0">
+          {/* Coluna Esquerda - Rankings (flexível) */}
+          <div className="flex-1 min-w-0 flex flex-col gap-4">
             {/* Ranking Entidades */}
             <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex-none">
                 <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
                   <Building2 className="w-4 h-4" />
-                  Top 5 - Atribuição por Entidades
+                  {`Top ${topN} - Atribuição por Entidades`}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 overflow-auto px-4 pb-3">
-                <div className="space-y-2">
-                  {(entityRanking ?? []).map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-500 w-6">#{idx + 1}</span>
-                        <span className="text-sm text-gray-900 font-medium truncate">{item.entity_name}</span>
-                      </div>
-                      <Badge className="bg-[#5A9BD4] text-white text-xs">{fmt(item.ticket_count)}</Badge>
+              <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+                {(entityRanking ?? []).map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-3 md:gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                      <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
+                      <span className="text-sm text-gray-900 font-medium truncate">{stripParentPrefix(item.entity_name)}</span>
                     </div>
-                  ))}
-                  {(!entityRanking || entityRanking.length === 0) && (
-                    <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
-                  )}
-                </div>
+                    <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0 ml-1 md:ml-2">
+                      {fmt(item.ticket_count)}
+                    </Badge>
+                  </div>
+                ))}
+                {(!entityRanking || entityRanking.length === 0) && (
+                  <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
+                )}
               </CardContent>
             </Card>
 
             {/* Ranking Categorias */}
             <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col">
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 flex-none">
               <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
                 <FolderKanban className="w-4 h-4" />
-                Top 5 - Atribuição por Categorias ({currentCategoryArea})
+                {`Top ${topN} - Atribuição por Categorias (${currentCategoryArea})`}
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto px-4 pb-3">
-              <div className="space-y-2">
-                {(() => {
-                  const items = (
-                    currentCategoryArea === 'Manutenção' ? manCategories :
-                    currentCategoryArea === 'Conservação' ? consCategories : outsCategories
-                  ).slice(0, 5);
-                  return items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-500 w-6">#{idx + 1}</span>
-                        <span className="text-sm text-gray-900 font-medium truncate">{item.category_name}</span>
-                      </div>
-                      <Badge className="bg-[#5A9BD4] text-white text-xs">{fmt(item.ticket_count)}</Badge>
+            <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+              {(() => {
+                const items = (
+                  currentCategoryArea === 'Manutenção' ? manCategories :
+                  currentCategoryArea === 'Conservação' ? consCategories : outsCategories
+                ).slice(0, topN);
+                return items.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
+                      <span className="text-sm text-gray-900 font-medium truncate">{item.category_name}</span>
                     </div>
-                  ));
-                })()}
-                {(
-                  (!categoryRanking || categoryRanking.length === 0) ||
-                  ((currentCategoryArea === 'Manutenção' ? manCategories : (currentCategoryArea === 'Conservação' ? consCategories : outsCategories)).length === 0)
-                ) && (
-                  <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
-                )}
-              </div>
+                    <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md">{fmt(item.ticket_count)}</Badge>
+                  </div>
+                ));
+              })()}
+              {(
+                (!categoryRanking || categoryRanking.length === 0) ||
+                ((currentCategoryArea === 'Manutenção' ? manCategories : (currentCategoryArea === 'Conservação' ? consCategories : outsCategories)).length === 0)
+              ) && (
+                <div className="text-center text-xs text-gray-500 py-4">Sem itens nesta área no período</div>
+              )}
             </CardContent>
           </Card>
           </div>
 
-          {/* Coluna Direita - Tickets Novos */}
-          <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
-                <Ticket className="w-4 h-4" />
-                Tickets Novos (Últimos)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-auto px-4 pb-3">
-              <div className="space-y-2">
-                {(newTickets ?? []).map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-500 w-10">#{item.id}</span>
-                      <span className="text-sm text-gray-900 font-medium truncate">{item.titulo}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-[#5A9BD4] text-white text-xs">{item.entidade}</Badge>
-                      <span className="text-xs text-gray-600">{item.data}</span>
-                    </div>
+          {/* Coluna Direita - Tickets Novos (fixa como no DTIC) */}
+          <div className="w-105 flex-shrink-0">
+            <Card className="bg-white shadow-sm border-0 h-full flex flex-col">
+              <CardHeader className="pb-3 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-lg">
+                    <Ticket className="w-5 h-5" />
+                    Tickets Novos
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">{newTickets ? `${newTickets.length} tickets` : '0 tickets'}</span>
+                    <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100" onClick={loadDashboardData}>
+                      <RotateCcw className="w-4 h-4" />
+                    </Button>
                   </div>
-                ))}
-                {(!newTickets || newTickets.length === 0) && (
-                  <div className="text-center text-xs text-gray-500 py-4">Sem tickets novos</div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-hidden p-0">
+                <div 
+                  className="h-full overflow-y-auto px-6 pb-6 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
+                >
+                  <div className="space-y-3">
+                    {(newTickets ?? []).map((item) => (
+                      <div key={item.id} className="border-l-4 border-[#5A9BD4] bg-[#5A9BD4]/5 p-3 rounded-r-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded">#{item.id ?? '-'}</span>
+                          <Badge variant="outline" className="border-[#5A9BD4] text-[#5A9BD4] bg-[#5A9BD4]/10 text-xs">Novo</Badge>
+                        </div>
+                        <h4 className="font-medium text-gray-900 mb-2 text-sm truncate" title={item.titulo}>{item.titulo}</h4>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-700 font-medium truncate" title={item.solicitante}>{item.solicitante}</span>
+                          <div className="flex flex-col items-end w-48">
+                            <span className="text-gray-600 whitespace-nowrap">{(item.data || '').split(' ')[1] || ''}</span>
+                            <span className="text-gray-600 whitespace-nowrap">{(item.data || '').split(' ')[0] || item.data}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {(!newTickets || newTickets.length === 0) && (
+                      <div className="w-full text-center text-xs text-gray-600 py-2">Sem tickets novos</div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

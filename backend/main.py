@@ -7,7 +7,11 @@ import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api import maintenance_router
+from .api import (
+    maintenance_stats_router,
+    maintenance_ranking_router,
+    maintenance_tickets_router,
+)
 
 
 def setup_logging() -> None:
@@ -45,12 +49,20 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5002",
         "http://127.0.0.1:5002",
+        "http://localhost:5003",
+        "http://127.0.0.1:5003",
+        "http://localhost:5004",
+        "http://127.0.0.1:5004",
+        "http://localhost:5005",
+        "http://127.0.0.1:5005",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(maintenance_router.router)
+app.include_router(maintenance_stats_router.router)
+app.include_router(maintenance_ranking_router.router)
+app.include_router(maintenance_tickets_router.router)
 
 
 @app.get("/health")
