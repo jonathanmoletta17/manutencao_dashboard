@@ -13,6 +13,16 @@ class MaintenanceGeneralStats(BaseModel):
     resolvidos: int
 
 
+class MaintenanceStatusTotals(BaseModel):
+    """Totais gerais por status, alinhados ao script PowerShell."""
+    novos: int
+    nao_solucionados: int  # (2 + 4)
+    planejados: int        # (3)
+    solucionados: int      # (5)
+    fechados: int          # (6)
+    resolvidos: int        # (5 + 6)
+
+
 class EntityRankingItem(BaseModel):
     """Item de ranking por entidade."""
     entity_name: str

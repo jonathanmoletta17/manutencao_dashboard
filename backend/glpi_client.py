@@ -62,10 +62,10 @@ def authenticate(api_url: str, app_token: str, user_token: str) -> Dict[str, str
             'App-Token': app_token
         }
         
-        # Configurar entidade ativa (CENTRAL DE ATENDIMENTOS = 2, recursivo)
+        # Configurar entidade ativa (conforme script exemplo: EntitiesId = 1, recursivo)
         change_entity_url = f"{api_url}/changeActiveEntities"
         entity_data = {
-            'entities_id': 2,
+            'entities_id': 1,
             'is_recursive': True
         }
         
@@ -94,7 +94,8 @@ def search_paginated(
     criteria: Optional[List[Dict]] = None,
     forcedisplay: Optional[List[str]] = None,
     uid_cols: bool = True,
-    range_step: int = 1000
+    range_step: int = 1000,
+    extra_params: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Busca paginada com suporte a grandes volumes de dados.
@@ -126,6 +127,9 @@ def search_paginated(
         for i, c in enumerate(criteria):
             for k, v in c.items():
                 params[f'criteria[{i}][{k}]'] = v
+    if extra_params:
+        for k, v in extra_params.items():
+            params[str(k)] = v
     
     try:
         while True:

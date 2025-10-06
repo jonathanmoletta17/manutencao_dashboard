@@ -22,7 +22,8 @@ import {
   fetchMaintenanceStatusTotals,
   fetchEntityRanking, 
   fetchCategoryRanking,
-  fetchMaintenanceNewTickets
+  fetchMaintenanceNewTickets,
+  fetchTopEntityAttribution
 } from './services/maintenance-api';
 import type { 
   MaintenanceGeneralStats, 
@@ -82,10 +83,10 @@ export default function MaintenanceDashboard() {
     }
 
     try {
-      const er = await fetchEntityRanking(inicio, fim, 5);
+      const er = await fetchTopEntityAttribution(5);
       setEntityRanking(er);
     } catch (err) {
-      console.error('Falha ao buscar Ranking de Entidades:', err);
+      console.error('Falha ao buscar Ranking de Entidades (Top atribuição global):', err);
     }
 
     try {

@@ -14,4 +14,16 @@ Env Vars (exemplo):
 - `CACHE_TTL_SECONDS` (se aplicável)
 
 Execução:
-- `python -m uvicorn main:app --reload --host 127.0.0.1 --port 8010`
+- `python -m uvicorn apps.manutencao.backend.main:app --reload --host 127.0.0.1 --port 8010`
+
+Endpoints:
+- `GET /api/v1/manutencao/status-totais`
+  - Totais gerais por status (Novos, Não solucionados 2+4, Planejados 3, Solucionados 5, Fechados 6, Resolvidos 5+6)
+  - Sem filtro de datas; usa cache com TTL (`CACHE_TTL_SEC`).
+- `GET /api/v1/manutencao/stats-gerais?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+  - Estatísticas no período por status (Novos 1, Pendentes 4, Planejados 2, Resolvidos 5).
+- `GET /api/v1/manutencao/ranking-entidades?inicio=YYYY-MM-DD&fim=YYYY-MM-DD&top=10`
+- `GET /api/v1/manutencao/ranking-categorias?inicio=YYYY-MM-DD&fim=YYYY-MM-DD&top=10`
+- `GET /api/v1/manutencao/tickets-novos?limit=10`
+- `GET /api/v1/manutencao/top-atribuicao-entidades?top=10`
+  - Ranking global (sem filtro de data) de atribuição por entidades, espelhando `top_entities.ps1`.

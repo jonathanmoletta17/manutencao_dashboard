@@ -50,3 +50,8 @@ export const fetchCategoryRanking = (inicio?: string, fim?: string, top: number 
 export const fetchMaintenanceNewTickets = (limit: number = 10) => {
   return fetchFromAPI<MaintenanceNewTicketItem[]>(`/manutencao/tickets-novos?limit=${limit}`);
 };
+
+// Top atribuição por entidades (global, sem filtro de datas)
+export const fetchTopEntityAttribution = (top: number = 10) => {
+  return fetchFromAPI<EntityRankingItem[]>(`/manutencao/top-atribuicao-entidades?top=${top}`);
+};
