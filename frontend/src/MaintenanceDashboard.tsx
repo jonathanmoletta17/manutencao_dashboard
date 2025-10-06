@@ -14,6 +14,7 @@ import {
   Building2,
   FolderKanban,
   Ticket,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
@@ -38,9 +39,21 @@ export default function MaintenanceDashboard() {
   const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
   const [newTickets, setNewTickets] = useState<MaintenanceNewTicketItem[] | null>(null);
   const [time, setTime] = useState<Date>(new Date());
-  const [topN, setTopN] = useState<number>(5);
+  const [topN, setTopN] = useState<number>(() => {
+    const url = new URL(window.location.href);
+    const qsTop = url.searchParams.get('top');
+    const n = qsTop ? Number(qsTop) : NaN;
+    const allowed = [5, 10, 20, 50];
+    return allowed.includes(n) ? n : 5;
+  });
   const [dateRange, setDateRange] = useState<{ inicio: string; fim: string }>(() => {
     const toYmd = (d: Date) => d.toISOString().slice(0, 10);
+    const url = new URL(window.location.href);
+    const qsInicio = url.searchParams.get('inicio');
+    const qsFim = url.searchParams.get('fim');
+    if (qsInicio && qsFim && qsInicio <= qsFim) {
+      return { inicio: qsInicio, fim: qsFim };
+    }
     const now = new Date();
     const end = new Date(now);
     const start = new Date(now);
@@ -51,6 +64,70 @@ export default function MaintenanceDashboard() {
   const refreshInFlight = useRef(false);
   const dateRangeRef = useRef(dateRange);
   const topNRef = useRef(topN);
+
+  // Dropdown customizado para Top N
+  const TopNSelect = ({ value, onChange }: { value: number; onChange: (n: number) => void }) => {
+    const [open, setOpen] = useState(false);
+    const options = [5, 10, 20, 50];
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Fecha apenas ao clicar fora ou pressionar Escape
+    useEffect(() => {
+      if (!open) return;
+      const onPointerDown = (e: PointerEvent) => {
+        const el = containerRef.current;
+        if (el && !el.contains(e.target as Node)) {
+          setOpen(false);
+        }
+      };
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setOpen(false);
+      };
+      document.addEventListener('pointerdown', onPointerDown);
+      document.addEventListener('keydown', onKeyDown);
+      return () => {
+        document.removeEventListener('pointerdown', onPointerDown);
+        document.removeEventListener('keydown', onKeyDown);
+      };
+    }, [open]);
+
+    return (
+      <div ref={containerRef} className="relative">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-white bg-white/10 hover:bg-white/20 border border-white/30 flex items-center gap-2"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="font-medium">{value}</span>
+          <ChevronDown className="w-4 h-4 text-white" />
+        </Button>
+        {open && (
+          <div className="absolute right-0 mt-1 w-24 bg-[#5A9BD4]/10 backdrop-blur-sm border border-white/30 rounded-md shadow-lg z-20">
+            <ul className="py-1">
+              {options.map((n) => (
+                <li key={n}>
+                  <button
+                    type="button"
+                    className={`w-full text-left px-3 py-1.5 text-sm text-white ${
+                      n === value ? 'bg-white/20' : 'hover:bg-white/10'
+                    }`}
+                    onClick={() => {
+                      onChange(n);
+                      setOpen(false);
+                    }}
+                  >
+                    {n}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  };
   
   useEffect(() => {
     dateRangeRef.current = dateRange;
@@ -78,6 +155,12 @@ export default function MaintenanceDashboard() {
   };
 
   const applyDateRange = () => {
+    const { inicio, fim } = dateRangeRef.current;
+    const url = new URL(window.location.href);
+    url.searchParams.set('inicio', inicio);
+    url.searchParams.set('fim', fim);
+    url.searchParams.set('top', String(topNRef.current));
+    window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
     loadDashboardData();
   };
 
@@ -136,6 +219,13 @@ export default function MaintenanceDashboard() {
   useEffect(() => {
     const { inicio, fim } = dateRangeRef.current;
     loadDashboardDataWith(inicio, fim);
+  }, [topN]);
+
+  // Persistir Top N no URL sempre que o usuário alterar
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('top', String(topN));
+    window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
   }, [topN]);
 
   // Polling configurável via .env
@@ -232,19 +322,10 @@ export default function MaintenanceDashboard() {
           <Button variant="ghost" size="sm" className="text-white hover:bg-blue-600" onClick={loadDashboardData}>
             <RotateCcw className="w-4 h-4" />
           </Button>
-          {/* Seletor Top N */}
+          {/* Seletor Top N (dropdown customizado) */}
           <div className="flex items-center gap-2 px-2 border-l border-white/20">
             <label className="text-sm text-blue-100">Top N</label>
-            <select
-              className="text-sm bg-white/20 text-white rounded px-2 py-1 focus:outline-none"
-              value={topN}
-              onChange={(e) => setTopN(Number(e.target.value))}
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
+            <TopNSelect value={topN} onChange={(n) => setTopN(n)} />
           </div>
           <div className="flex items-center gap-3 pl-4 border-l border-white/20">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -371,7 +452,7 @@ export default function MaintenanceDashboard() {
                       <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
                       <span className="text-sm text-gray-900 font-medium truncate">{item.category_name}</span>
                     </div>
-                    <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md">{fmt(item.ticket_count)}</Badge>
+                    <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0">{fmt(item.ticket_count)}</Badge>
                   </div>
                 ));
               })()}
@@ -385,8 +466,8 @@ export default function MaintenanceDashboard() {
           </Card>
           </div>
 
-          {/* Coluna Direita - Tickets Novos (fixa como no DTIC) */}
-          <div className="w-105 flex-shrink-0">
+          {/* Coluna Direita - Tickets Novos (largura restaurada) */}
+          <div className="w-135 flex-shrink-0">
             <Card className="bg-white shadow-sm border-0 h-full flex flex-col">
               <CardHeader className="pb-3 flex-shrink-0">
                 <div className="flex items-center justify-between">

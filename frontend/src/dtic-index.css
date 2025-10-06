@@ -553,8 +553,8 @@
     width: calc(var(--spacing) * 80);
   }
 
-  .w-105 {
-    width: calc(var(--spacing) * 105);
+  .w-135 {
+    width: calc(var(--spacing) * 135);
   }
 
   .w-fit {
@@ -567,6 +567,10 @@
 
   .min-w-0 {
     min-width: calc(var(--spacing) * 0);
+  }
+
+  .min-h-0 {
+    min-height: 0;
   }
 
   .flex-1 {
