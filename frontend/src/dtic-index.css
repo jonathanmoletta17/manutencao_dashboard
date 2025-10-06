@@ -521,6 +521,10 @@
     height: calc(100vh - 80px);
   }
 
+  .h-\[calc\(100vh-64px\)\] {
+    height: calc(100vh - 64px);
+  }
+
   .h-full {
     height: 100%;
   }

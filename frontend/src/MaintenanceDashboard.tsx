@@ -402,9 +402,9 @@ export default function MaintenanceDashboard() {
         {/* Main Content - 2 colunas */}
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Coluna Esquerda - Rankings (flexível) */}
-          <div className="flex-1 min-w-0 flex flex-col gap-4">
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4">
             {/* Ranking Entidades */}
-            <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col">
+            <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
               <CardHeader className="pb-2 flex-none">
                 <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
                   <Building2 className="w-4 h-4" />
@@ -433,7 +433,7 @@ export default function MaintenanceDashboard() {
             </Card>
 
             {/* Ranking Categorias */}
-            <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col">
+            <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
             <CardHeader className="pb-2 flex-none">
               <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
                 <FolderKanban className="w-4 h-4" />
