@@ -1,7 +1,8 @@
 import { 
   useState, 
   useEffect,
-  useRef
+  useRef,
+  useMemo
 } from 'react';
 import {
   RotateCcw,
@@ -23,7 +24,8 @@ import {
   fetchEntityRanking, 
   fetchCategoryRanking,
   fetchMaintenanceNewTickets,
-  fetchTopEntityAttribution
+  fetchTopEntityAttribution,
+  fetchTopCategoryAttribution
 } from './services/maintenance-api';
 import type { 
   MaintenanceGeneralStats, 
@@ -90,10 +92,10 @@ export default function MaintenanceDashboard() {
     }
 
     try {
-      const cr = await fetchCategoryRanking(inicio, fim, 5);
+      const cr = await fetchTopCategoryAttribution(50);
       setCategoryRanking(cr);
     } catch (err) {
-      console.error('Falha ao buscar Ranking de Categorias:', err);
+      console.error('Falha ao buscar Ranking de Categorias (Top atribuição global):', err);
     }
 
     try {
@@ -132,6 +134,44 @@ export default function MaintenanceDashboard() {
   // Relógio
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ====== Classificação por macro área e carrossel ======
+  const removeDiacritics = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
+  const classifyMacroArea = (label: string) => {
+    if (!label) return 'Outros' as const;
+    const first = label.split('>', 1)[0].trim();
+    const plain = removeDiacritics(first).toLowerCase();
+    if (plain.startsWith('manutencao')) return 'Manutenção' as const;
+    if (plain.startsWith('conservacao')) return 'Conservação' as const;
+    return 'Outros' as const;
+  };
+
+  const { manCategories, consCategories, outsCategories } = useMemo(() => {
+    const man: CategoryRankingItem[] = [];
+    const cons: CategoryRankingItem[] = [];
+    const outs: CategoryRankingItem[] = [];
+    (categoryRanking ?? []).forEach((item) => {
+      const grp = classifyMacroArea(item.category_name);
+      if (grp === 'Manutenção') man.push(item);
+      else if (grp === 'Conservação') cons.push(item);
+      else outs.push(item);
+    });
+    // ordenar por ticket_count desc para garantir Top 5 correto por grupo
+    man.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
+    cons.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
+    outs.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
+    return { manCategories: man, consCategories: cons, outsCategories: outs };
+  }, [categoryRanking]);
+
+  const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação' | 'Outros'>('Manutenção');
+
+  useEffect(() => {
+    const intervalMs = Number(import.meta.env.VITE_CATEGORY_CAROUSEL_INTERVAL_SEC ?? 15000);
+    const id = setInterval(() => {
+      setCurrentCategoryArea((prev) => (prev === 'Manutenção' ? 'Conservação' : (prev === 'Conservação' ? 'Outros' : 'Manutenção')));
+    }, intervalMs);
     return () => clearInterval(id);
   }, []);
 
@@ -261,15 +301,20 @@ export default function MaintenanceDashboard() {
 
             {/* Ranking Categorias */}
             <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
-                  <FolderKanban className="w-4 h-4" />
-                  Top 5 - Atribuição por Categorias
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-auto px-4 pb-3">
-                <div className="space-y-2">
-                  {(categoryRanking ?? []).map((item, idx) => (
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
+                <FolderKanban className="w-4 h-4" />
+                Top 5 - Atribuição por Categorias ({currentCategoryArea})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto px-4 pb-3">
+              <div className="space-y-2">
+                {(() => {
+                  const items = (
+                    currentCategoryArea === 'Manutenção' ? manCategories :
+                    currentCategoryArea === 'Conservação' ? consCategories : outsCategories
+                  ).slice(0, 5);
+                  return items.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-gray-500 w-6">#{idx + 1}</span>
@@ -277,13 +322,17 @@ export default function MaintenanceDashboard() {
                       </div>
                       <Badge className="bg-[#5A9BD4] text-white text-xs">{fmt(item.ticket_count)}</Badge>
                     </div>
-                  ))}
-                  {(!categoryRanking || categoryRanking.length === 0) && (
-                    <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  ));
+                })()}
+                {(
+                  (!categoryRanking || categoryRanking.length === 0) ||
+                  ((currentCategoryArea === 'Manutenção' ? manCategories : (currentCategoryArea === 'Conservação' ? consCategories : outsCategories)).length === 0)
+                ) && (
+                  <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
           </div>
 
           {/* Coluna Direita - Tickets Novos */}

@@ -55,3 +55,8 @@ export const fetchMaintenanceNewTickets = (limit: number = 10) => {
 export const fetchTopEntityAttribution = (top: number = 10) => {
   return fetchFromAPI<EntityRankingItem[]>(`/manutencao/top-atribuicao-entidades?top=${top}`);
 };
+
+// Top atribuição por categorias (global, sem filtro de datas)
+export const fetchTopCategoryAttribution = (top: number = 10) => {
+  return fetchFromAPI<CategoryRankingItem[]>(`/manutencao/top-atribuicao-categorias?top=${top}`);
+};

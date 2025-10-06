@@ -421,27 +421,170 @@ def get_maintenance_new_tickets(
     criteria = [
         {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': STATUS_NEW}
     ]
-    
-    # Campos: ID, Nome (título), Solicitante(4), Data(15), Entidade(80)
+
+    # Campos conforme DTIC: Título(1), ID(2), Requisitante(4), Data de Criação(15), Entidade(80)
+    forced = [str(FIELD_NAME), str(FIELD_ID), '4', str(FIELD_CREATED), str(FIELD_ENTITY)]
     tickets_data = glpi_client.search_paginated(
         headers=session_headers,
         api_url=api_url,
         itemtype='Ticket',
         criteria=criteria,
-        forcedisplay=[FIELD_ID, FIELD_NAME, '4', FIELD_CREATED, FIELD_ENTITY],
-        uid_cols=True,
-        range_step=limit
+        forcedisplay=forced,
+        uid_cols=False,
+        range_step=100,
+        extra_params={'expand_dropdowns': '1', 'is_recursive': '1'}
     )
-    
-    # Formatar resposta
-    result = []
-    for ticket in tickets_data[:limit]:
+
+    if not tickets_data:
+        return []
+
+    # Ordena por ID desc e limita
+    def safe_int(v: Any) -> int:
+        try:
+            return int(str(v))
+        except Exception:
+            return 0
+
+    sorted_tickets = sorted(tickets_data, key=lambda x: safe_int(x.get(str(FIELD_ID))), reverse=True)[:limit]
+
+    # Extrai IDs de requisitante para resolver nomes em lote
+    def get_first_numeric_id(value: Any):
+        if value is None:
+            return None
+        if isinstance(value, list):
+            for v in value:
+                v_str = str(v)
+                if v_str.isdigit():
+                    return int(v_str)
+            return None
+        v_str = str(value)
+        return int(v_str) if v_str.isdigit() else None
+
+    requester_ids = []
+    for t in sorted_tickets:
+        rid = get_first_numeric_id(t.get('4'))
+        if isinstance(rid, int):
+            requester_ids.append(rid)
+
+    names_map = glpi_client.get_user_names_in_batch_with_fallback(session_headers, api_url, requester_ids)
+
+    # Formatar resposta alinhada ao DTIC
+    result: List[Dict[str, Any]] = []
+    for t in sorted_tickets:
+        ticket_id = safe_int(t.get(str(FIELD_ID)))
+        titulo = t.get(str(FIELD_NAME)) or 'Sem título'
+        created_raw = t.get(str(FIELD_CREATED))
+
+        # Formatação de data: dd/MM/YYYY HH:mm
+        data_fmt = ''
+        if isinstance(created_raw, str) and created_raw:
+            try:
+                from datetime import datetime
+                dt = datetime.strptime(created_raw, "%Y-%m-%d %H:%M:%S")
+                data_fmt = dt.strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                data_fmt = created_raw[:16]
+
+        # Solicitante: se expand_dropdowns já trouxe nome legível, usa; senão, resolve pelo mapa
+        solicitante = 'Não informado'
+        raw_req = t.get('4')
+        if isinstance(raw_req, str) and not raw_req.isdigit():
+            solicitante = raw_req
+        else:
+            rid = get_first_numeric_id(raw_req)
+            if isinstance(rid, int) and rid in names_map:
+                solicitante = names_map[rid]
+
+        entidade = t.get(str(FIELD_ENTITY)) or 'Sem entidade'
+
         result.append({
-            'id': ticket.get(FIELD_ID, 0),
-            'titulo': ticket.get(FIELD_NAME, 'Sem título'),
-            'solicitante': ticket.get('4', 'Não informado'),
-            'data': ticket.get(FIELD_CREATED, '')[:10] if ticket.get(FIELD_CREATED) else '',
-            'entidade': ticket.get(FIELD_ENTITY, 'Sem entidade')
+            'id': ticket_id,
+            'titulo': titulo,
+            'solicitante': solicitante,
+            'data': data_fmt,
+            'entidade': entidade
         })
-    
+
+    return result
+
+
+def generate_category_top_all(
+    api_url: str,
+    session_headers: Dict[str, str],
+    top_n: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Top N de atribuição por categorias (sem filtro de datas),
+    espelhando o script PowerShell top_categories.ps1.
+
+    Etapas:
+    - Busca todos os tickets com ID de categoria bruto (display_type=2)
+    - Conta por ID de categoria (fallback 0 quando ausente)
+    - Busca categorias para mapear ID -> nome (completename/name)
+    - Retorna top N ordenado por contagem
+    """
+    tickets_data = glpi_client.search_paginated(
+        headers=session_headers,
+        api_url=api_url,
+        itemtype='Ticket',
+        criteria=[],
+        forcedisplay=[str(FIELD_CATEGORY)],
+        uid_cols=False,
+        range_step=300,
+        extra_params={'display_type': '2', 'is_recursive': '1'}
+    )
+
+    id_counts: Dict[str, int] = {}
+    for row in tickets_data:
+        cid = str(row.get(str(FIELD_CATEGORY), '0'))
+        if not cid:
+            cid = '0'
+        id_counts[cid] = id_counts.get(cid, 0) + 1
+
+    if not id_counts:
+        return []
+
+    category_rows = glpi_client.search_paginated(
+        headers=session_headers,
+        api_url=api_url,
+        itemtype='ITILCategory',
+        criteria=[],
+        forcedisplay=['ITILCategory.id', 'ITILCategory.completename', 'ITILCategory.name'],
+        uid_cols=True,
+        range_step=300
+    )
+
+    def sanitize_label(s: Any) -> str:
+        if not isinstance(s, str):
+            s = str(s) if s is not None else ''
+        t = s
+        replacements = {
+            '&amp;#62;': '>',
+            '&#62;': '>',
+            '&gt;': '>',
+            '&amp;gt;': '>',
+            '&#39;': "'",
+            '&amp;': '&',
+        }
+        for k, v in replacements.items():
+            t = t.replace(k, v)
+        return t
+
+    name_by_id: Dict[str, str] = {}
+    for cr in category_rows:
+        oid = str(cr.get('ITILCategory.id', ''))
+        comp = cr.get('ITILCategory.completename')
+        nm = cr.get('ITILCategory.name')
+        label = sanitize_label(comp or nm or oid)
+        if oid and (oid not in name_by_id):
+            name_by_id[oid] = label
+
+    sorted_items = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    result: List[Dict[str, Any]] = []
+    for cid, count in sorted_items:
+        nm = name_by_id.get(cid)
+        if not nm:
+            nm = 'sem' if cid == '0' else cid
+        result.append({'category_name': nm, 'ticket_count': count})
+
     return result
