@@ -276,6 +276,11 @@ export default function MaintenanceDashboard() {
 
   const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação' | 'Outros'>('Manutenção');
   const areas: ReadonlyArray<'Manutenção' | 'Conservação' | 'Outros'> = ['Manutenção', 'Conservação', 'Outros'] as const;
+  const pauseUntilRef = useRef<number>(0);
+  const PAUSE_MS = 20000;
+  const schedulePause = useCallback(() => {
+    pauseUntilRef.current = Date.now() + PAUSE_MS;
+  }, []);
 
   const goPrevArea = useCallback(() => {
     setCurrentCategoryArea((prev) => {
@@ -283,7 +288,8 @@ export default function MaintenanceDashboard() {
       const nextIdx = (idx - 1 + areas.length) % areas.length;
       return areas[nextIdx];
     });
-  }, [areas]);
+    schedulePause();
+  }, [areas, schedulePause]);
 
   const goNextArea = useCallback(() => {
     setCurrentCategoryArea((prev) => {
@@ -291,7 +297,8 @@ export default function MaintenanceDashboard() {
       const nextIdx = (idx + 1) % areas.length;
       return areas[nextIdx];
     });
-  }, [areas]);
+    schedulePause();
+  }, [areas, schedulePause]);
 
   useEffect(() => {
     const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
@@ -303,6 +310,7 @@ export default function MaintenanceDashboard() {
         ? Number(rawCarouselSec) * 1000
         : 15000;
     const id = setInterval(() => {
+      if (Date.now() < pauseUntilRef.current) return;
       setCurrentCategoryArea((prev) => (prev === 'Manutenção' ? 'Conservação' : (prev === 'Conservação' ? 'Outros' : 'Manutenção')));
     }, intervalMs);
     return () => clearInterval(id);
@@ -434,7 +442,7 @@ export default function MaintenanceDashboard() {
                   {`Top ${topN} - Atribuição por Entidades`}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
+              <CardContent className="px-4 pb-3 pr-3 flex-1 min-h-0 space-y-3 overflow-y-auto">
                 {(entityRanking ?? []).map((item, idx) => (
                   <div
                     key={idx}
@@ -463,7 +471,7 @@ export default function MaintenanceDashboard() {
                   <FolderKanban className="w-4 h-4" />
                   {`Top ${topN} - Atribuição por Categorias (${currentCategoryArea})`}
                 </CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center">
                   <button
                     type="button"
                     aria-label="Anterior"
@@ -472,18 +480,20 @@ export default function MaintenanceDashboard() {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <div className="flex items-center gap-2" aria-label="Indicadores de área">
+                  <div className="flex items-center gap-1" aria-label="Indicadores de área">
                     {areas.map((a) => (
                       <button
                         key={a}
                         type="button"
                         aria-label={`Ir para ${a}`}
-                        onClick={() => setCurrentCategoryArea(a)}
+                        onClick={() => { setCurrentCategoryArea(a); schedulePause(); }}
                         className="rounded-full border-0"
                         style={{
-                          width: 8,
-                          height: 8,
-                          backgroundColor: currentCategoryArea === a ? '#5A9BD4' : 'var(--color-gray-300)'
+                          width: 5,
+                          height: 5,
+                          backgroundColor: currentCategoryArea === a ? 'rgba(90,155,212,0.65)' : 'transparent',
+                          border: currentCategoryArea === a ? '1px solid rgba(90,155,212,0.65)' : '1px solid rgba(0,0,0,0.22)',
+                          opacity: currentCategoryArea === a ? 0.8 : 0.35
                         }}
                       />
                     ))}
@@ -499,7 +509,7 @@ export default function MaintenanceDashboard() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
+            <CardContent className="px-4 pb-3 pr-3 flex-1 min-h-0 space-y-3 overflow-y-auto">
               {(() => {
                 const items = (
                   currentCategoryArea === 'Manutenção' ? manCategories :
