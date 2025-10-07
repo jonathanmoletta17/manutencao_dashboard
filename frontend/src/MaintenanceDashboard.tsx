@@ -407,6 +407,7 @@ export default function MaintenanceDashboard() {
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Coluna Esquerda - Rankings (flexível) */}
           <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4">
+            <div className="flex gap-4 min-w-0 flex-1 min-h-0">
             <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
               <CardHeader className="pb-2 flex-none">
                 <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
@@ -414,7 +415,7 @@ export default function MaintenanceDashboard() {
                   {`Top ${topN} - Atribuição por Entidades`}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+              <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
                 {(entityRanking ?? []).map((item, idx) => (
                   <div
                     key={idx}
@@ -443,7 +444,7 @@ export default function MaintenanceDashboard() {
                 {`Top ${topN} - Atribuição por Categorias (${currentCategoryArea})`}
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-2 overflow-y-auto pr-1">
+            <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
               {(() => {
                 const items = (
                   currentCategoryArea === 'Manutenção' ? manCategories :
@@ -467,6 +468,7 @@ export default function MaintenanceDashboard() {
               )}
             </CardContent>
           </Card>
+            </div>
             {/* Ranking Técnicos */}
             <TechnicianRanking items={technicianRanking} topN={topN} />
             {/* Ranking Entidades */}

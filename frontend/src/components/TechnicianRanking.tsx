@@ -27,7 +27,7 @@ export function TechnicianRanking({ items, title = 'Ranking de Técnicos', topN 
   const list = (items ?? []).slice(0, topN ?? (items?.length ?? 0));
 
   return (
-    <Card className="bg-white shadow-sm border-0 flex-1 min-h-0">
+    <Card className="bg-white shadow-sm border-0">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
           <Award className="w-4 h-4" />
