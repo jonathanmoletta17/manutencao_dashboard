@@ -22,10 +22,19 @@ class SimpleCache:
         if (time.time() - ts) < ttl:
             self.hits += 1
             return value
-        # Expirado: remove e contabiliza miss
-        self._store.pop(key, None)
+        # Expirado: não remove para permitir fallback de stale
         self.misses += 1
         return None
+
+    def get_stale(self, key: str) -> Optional[Any]:
+        """Retorna o valor mesmo expirado (stale), se existir.
+        Não contabiliza hit, apenas permite fallback em caso de erro externo.
+        """
+        entry = self._store.get(key)
+        if not entry:
+            return None
+        value, _, _ = entry
+        return value
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         self._store[key] = (value, time.time(), ttl or self.default_ttl)

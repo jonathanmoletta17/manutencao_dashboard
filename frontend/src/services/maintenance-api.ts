@@ -62,19 +62,30 @@ export const fetchTopCategoryAttribution = (top: number = 10) => {
 export const fetchTechnicianRanking = async (inicio?: string, fim?: string, top: number = 10) => {
   const qs = inicio && fim ? `?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}&top=${top}` : `?top=${top}`;
   const url = `${API_BASE_URL}/manutencao/ranking-tecnicos${qs}`;
+  // Guardar último valor válido para evitar "piscar" vazio em erros intermitentes
+  // Escopo de módulo: persiste enquanto a página estiver carregada
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const globalAny = globalThis as any;
+  if (!globalAny.__lastTechnicianRanking) {
+    globalAny.__lastTechnicianRanking = [] as TechnicianRankingItem[];
+  }
   try {
     const response = await fetch(url);
     if (!response.ok) {
       // Tratar 404/501 como ausência de dados, para não quebrar o layout
       if (response.status === 404 || response.status === 501) {
-        return [] as TechnicianRankingItem[];
+        // manter último conhecido, mesmo que vazio inicialmente
+        return globalAny.__lastTechnicianRanking as TechnicianRankingItem[];
       }
       const errorData = await response.json().catch(() => ({ detail: `Erro ${response.status} ao acessar ${url}` }));
       throw new Error(errorData.detail || `Falha ao buscar ranking de técnicos`);
     }
-    return (await response.json()) as TechnicianRankingItem[];
+    const data = (await response.json()) as TechnicianRankingItem[];
+    globalAny.__lastTechnicianRanking = data;
+    return data;
   } catch (err) {
     console.error('Erro de rede ao buscar ranking de técnicos:', err);
-    return [] as TechnicianRankingItem[];
+    // Retornar último valor válido ao invés de zerar
+    return globalAny.__lastTechnicianRanking as TechnicianRankingItem[];
   }
 };

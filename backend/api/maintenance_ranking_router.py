@@ -61,12 +61,24 @@ def get_entity_ranking(inicio: str, fim: str, top: Optional[int] = 10):
 
     except GLPIAuthError as e:
         logger.error("Erro de autenticação GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-entidades devido a falha de autenticação")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPINetworkError as e:
         logger.error("Erro de rede GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-entidades devido a erro de rede")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPISearchError as e:
         logger.error("Erro de busca GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-entidades devido a erro de busca")
+            return stale
         raise HTTPException(status_code=502, detail="Erro ao buscar dados no GLPI.")
     except Exception as e:
         logger.exception("Erro inesperado ao buscar ranking de entidades: %s", str(e))
@@ -107,12 +119,24 @@ def get_category_ranking(inicio: str, fim: str, top: Optional[int] = 10):
 
     except GLPIAuthError as e:
         logger.error("Erro de autenticação GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-categorias devido a falha de autenticação")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPINetworkError as e:
         logger.error("Erro de rede GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-categorias devido a erro de rede")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPISearchError as e:
         logger.error("Erro de busca GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-categorias devido a erro de busca")
+            return stale
         raise HTTPException(status_code=502, detail="Erro ao buscar dados no GLPI.")
     except Exception as e:
         logger.exception("Erro inesperado ao buscar ranking de categorias: %s", str(e))
@@ -151,12 +175,24 @@ def get_top_atribuicao_entidades(top: Optional[int] = 10):
 
     except GLPIAuthError as e:
         logger.error("Erro de autenticação GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para top-atribuicao-entidades devido a falha de autenticação")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPINetworkError as e:
         logger.error("Erro de rede GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para top-atribuicao-entidades devido a erro de rede")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPISearchError as e:
         logger.error("Erro de busca GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para top-atribuicao-entidades devido a erro de busca")
+            return stale
         raise HTTPException(status_code=502, detail="Erro ao buscar dados no GLPI.")
     except Exception as e:
         logger.exception("Erro inesperado ao buscar top atribuição por entidades: %s", str(e))
@@ -195,12 +231,24 @@ def get_top_atribuicao_categorias(top: Optional[int] = 10):
 
     except GLPIAuthError as e:
         logger.error("Erro de autenticação GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para top-atribuicao-categorias devido a falha de autenticação")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPINetworkError as e:
         logger.error("Erro de rede GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para top-atribuicao-categorias devido a erro de rede")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPISearchError as e:
         logger.error("Erro de busca GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para top-atribuicao-categorias devido a erro de busca")
+            return stale
         raise HTTPException(status_code=502, detail="Erro ao buscar dados no GLPI.")
     except Exception as e:
         logger.exception("Erro inesperado ao buscar top atribuição por categorias: %s", str(e))
@@ -241,12 +289,24 @@ def get_technician_ranking(inicio: str, fim: str, top: Optional[int] = 10):
 
     except GLPIAuthError as e:
         logger.error("Erro de autenticação GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-tecnicos devido a falha de autenticação")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPINetworkError as e:
         logger.error("Erro de rede GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-tecnicos devido a erro de rede")
+            return stale
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPISearchError as e:
         logger.error("Erro de busca GLPI: %s", str(e))
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para ranking-tecnicos devido a erro de busca")
+            return stale
         raise HTTPException(status_code=502, detail="Erro ao buscar dados no GLPI.")
     except Exception as e:
         logger.exception("Erro inesperado ao buscar ranking de técnicos: %s", str(e))
