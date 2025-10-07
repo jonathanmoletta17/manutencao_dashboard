@@ -18,26 +18,30 @@ import {
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { 
-  fetchMaintenanceGeneralStats,
-  fetchMaintenanceNewTickets,
-  fetchEntityRanking,
-  fetchCategoryRanking
-} from './services/maintenance-api';
-import type { 
-  MaintenanceGeneralStats,
-  EntityRankingItem, 
-  CategoryRankingItem,
-  MaintenanceNewTicketItem 
-} from './types/maintenance-api.d';
-import { DateRangePicker } from './components/DateRangePicker';
-import { TopNSelect } from './components/TopNSelect';
+  import { 
+    fetchMaintenanceGeneralStats,
+    fetchMaintenanceNewTickets,
+    fetchEntityRanking,
+    fetchCategoryRanking,
+    fetchTechnicianRanking
+  } from './services/maintenance-api';
+  import type { 
+    MaintenanceGeneralStats,
+    EntityRankingItem, 
+    CategoryRankingItem,
+    MaintenanceNewTicketItem,
+    TechnicianRankingItem
+  } from './types/maintenance-api.d';
+  import { DateRangePicker } from './components/DateRangePicker';
+  import { TopNSelect } from './components/TopNSelect';
+  import TechnicianRanking from './components/TechnicianRanking';
 
 export default function MaintenanceDashboard() {
   const [generalStats, setGeneralStats] = useState<MaintenanceGeneralStats | null>(null);
   
   const [entityRanking, setEntityRanking] = useState<EntityRankingItem[] | null>(null);
   const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
+  const [technicianRanking, setTechnicianRanking] = useState<TechnicianRankingItem[] | null>(null);
   const [newTickets, setNewTickets] = useState<MaintenanceNewTicketItem[] | null>(null);
   const [time, setTime] = useState<Date>(new Date());
   const [topN, setTopN] = useState<number>(() => {
@@ -140,6 +144,17 @@ export default function MaintenanceDashboard() {
       setNewTickets(nt);
     } catch (err) {
       console.error('Falha ao buscar Tickets Novos:', err);
+    }
+
+    // Ranking de técnicos (sem níveis na manutenção)
+    try {
+      const inRange = inicio ?? dateRangeRef.current.inicio;
+      const endRange = fim ?? dateRangeRef.current.fim;
+      const topParam = topNRef.current;
+      const tk = await fetchTechnicianRanking(inRange, endRange, topParam);
+      setTechnicianRanking(tk);
+    } catch (err) {
+      console.error('Falha ao buscar Ranking de Técnicos:', err);
     }
 
     // Em atendimento agora vem do stats-gerais (com filtro de datas)
@@ -354,6 +369,8 @@ export default function MaintenanceDashboard() {
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Coluna Esquerda - Rankings (flexível) */}
           <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4">
+            {/* Ranking Técnicos */}
+            <TechnicianRanking items={technicianRanking} topN={topN} />
             {/* Ranking Entidades */}
             <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
               <CardHeader className="pb-2 flex-none">

@@ -18,6 +18,12 @@ export interface CategoryRankingItem {
   ticket_count: number;
 }
 
+/** Corresponde ao schema de ranking de técnicos (nome e total de tickets). */
+export interface TechnicianRankingItem {
+  tecnico: string;
+  tickets: number;
+}
+
 export interface MaintenanceNewTicketItem {
   id: number;
   titulo: string;

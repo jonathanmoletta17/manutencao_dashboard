@@ -37,6 +37,12 @@ class CategoryRankingItem(BaseModel):
     ticket_count: int
 
 
+class TechnicianRankingItem(BaseModel):
+    """Item de ranking por técnico (nome e total de tickets)."""
+    tecnico: str
+    tickets: int
+
+
 class MaintenanceNewTicketItem(BaseModel):
     """Ticket novo de manutenção."""
     id: int

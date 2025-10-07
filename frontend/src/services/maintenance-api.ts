@@ -3,6 +3,7 @@ import type {
   EntityRankingItem,
   CategoryRankingItem,
   MaintenanceNewTicketItem,
+  TechnicianRankingItem,
 } from '../types/maintenance-api.d';
 
 // Prefixo da API de manutenção
@@ -54,4 +55,25 @@ export const fetchTopEntityAttribution = (top: number = 10) => {
 // Top atribuição por categorias (global, sem filtro de datas)
 export const fetchTopCategoryAttribution = (top: number = 10) => {
   return fetchFromAPI<CategoryRankingItem[]>(`/manutencao/top-atribuicao-categorias?top=${top}`);
+};
+
+// Ranking de Técnicos (por período). Se o endpoint não existir ainda, retorna [] ao invés de falhar.
+export const fetchTechnicianRanking = async (inicio?: string, fim?: string, top: number = 10) => {
+  const qs = inicio && fim ? `?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}&top=${top}` : `?top=${top}`;
+  const url = `${API_BASE_URL}/manutencao/ranking-tecnicos${qs}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      // Tratar 404/501 como ausência de dados, para não quebrar o layout
+      if (response.status === 404 || response.status === 501) {
+        return [] as TechnicianRankingItem[];
+      }
+      const errorData = await response.json().catch(() => ({ detail: `Erro ${response.status} ao acessar ${url}` }));
+      throw new Error(errorData.detail || `Falha ao buscar ranking de técnicos`);
+    }
+    return (await response.json()) as TechnicianRankingItem[];
+  } catch (err) {
+    console.error('Erro de rede ao buscar ranking de técnicos:', err);
+    return [] as TechnicianRankingItem[];
+  }
 };
