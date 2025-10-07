@@ -346,15 +346,15 @@ export default function MaintenanceDashboard() {
           </Card>
 
           {/* Em atendimento (status 2 - atribuído/em progresso) por período */}
-          <Card className="bg-white border-l-4 border-l-sky-500 shadow-sm">
+          <Card className="bg-white border-l-4 shadow-sm" style={{ borderLeftColor: '#1E3A8A' }}>
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Em atendimento</p>
                   <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.em_atendimento)}</p>
                 </div>
-                <div className="w-10 h-10 p-1 bg-sky-100 rounded-xl flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5 text-sky-600" />
+                <div className="w-10 h-10 p-1 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: 'rgba(30,58,138,0.18)' }}>
+                  <Clock className="w-5 h-5" style={{ color: '#1E3A8A' }} />
                 </div>
               </div>
             </CardContent>
@@ -374,15 +374,15 @@ export default function MaintenanceDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-l-4 border-l-purple-500 shadow-sm">
+          <Card className="bg-white border-l-4 border-l-orange-500 shadow-sm">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Planejados</p>
                   <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.planejados)}</p>
                 </div>
-                <div className="w-10 h-10 p-1 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5 text-purple-600" />
+                <div className="w-10 h-10 p-1 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-orange-900" />
                 </div>
               </div>
             </CardContent>
