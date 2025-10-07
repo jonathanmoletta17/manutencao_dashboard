@@ -15,6 +15,8 @@ import {
   Building2,
   FolderKanban,
   Ticket,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
@@ -273,6 +275,23 @@ export default function MaintenanceDashboard() {
   }, [categoryRanking, classifyMacroArea]);
 
   const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação' | 'Outros'>('Manutenção');
+  const areas: ReadonlyArray<'Manutenção' | 'Conservação' | 'Outros'> = ['Manutenção', 'Conservação', 'Outros'] as const;
+
+  const goPrevArea = useCallback(() => {
+    setCurrentCategoryArea((prev) => {
+      const idx = areas.indexOf(prev);
+      const nextIdx = (idx - 1 + areas.length) % areas.length;
+      return areas[nextIdx];
+    });
+  }, [areas]);
+
+  const goNextArea = useCallback(() => {
+    setCurrentCategoryArea((prev) => {
+      const idx = areas.indexOf(prev);
+      const nextIdx = (idx + 1) % areas.length;
+      return areas[nextIdx];
+    });
+  }, [areas]);
 
   useEffect(() => {
     const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
@@ -439,10 +458,46 @@ export default function MaintenanceDashboard() {
             {/* Ranking Categorias */}
             <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
             <CardHeader className="pb-2 flex-none">
-              <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
-                <FolderKanban className="w-4 h-4" />
-                {`Top ${topN} - Atribuição por Categorias (${currentCategoryArea})`}
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
+                  <FolderKanban className="w-4 h-4" />
+                  {`Top ${topN} - Atribuição por Categorias (${currentCategoryArea})`}
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Anterior"
+                    className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md px-2 py-1"
+                    onClick={goPrevArea}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-center gap-2" aria-label="Indicadores de área">
+                    {areas.map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        aria-label={`Ir para ${a}`}
+                        onClick={() => setCurrentCategoryArea(a)}
+                        className="rounded-full border-0"
+                        style={{
+                          width: 8,
+                          height: 8,
+                          backgroundColor: currentCategoryArea === a ? '#5A9BD4' : 'var(--color-gray-300)'
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Próximo"
+                    className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md px-2 py-1"
+                    onClick={goNextArea}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="px-4 pb-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1">
               {(() => {
