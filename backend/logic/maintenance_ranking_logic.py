@@ -315,12 +315,22 @@ def generate_category_top_all(
             t = t.replace(k, v)
         return t
 
+    def normalize_label(s: str) -> str:
+        return (s or '').strip().lower()
+
+    def is_invalid_label(s: str) -> bool:
+        ns = normalize_label(s)
+        return ns in ('none', 'null', '')
+
     name_by_id: Dict[str, str] = {}
     for cr in category_rows:
         oid = str(cr.get('ITILCategory.id', ''))
         comp = cr.get('ITILCategory.completename')
         nm = cr.get('ITILCategory.name')
         label = sanitize_label(comp or nm or oid)
+        # Ignorar rótulos inválidos como 'None'/'null' ou vazio
+        if is_invalid_label(label):
+            continue
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
@@ -329,7 +339,13 @@ def generate_category_top_all(
     for cid, count in sorted_items:
         nm = name_by_id.get(cid)
         if not nm:
-            nm = 'sem' if cid == '0' else cid
+            if cid == '0':
+                nm = 'sem'
+            else:
+                # Sem nome válido: omitir item
+                continue
+        if is_invalid_label(nm):
+            continue
         result.append({'category_name': nm, 'ticket_count': count})
 
     return result
@@ -393,6 +409,9 @@ def generate_technician_ranking(
         key = normalize_tech_key(raw_val)
         id_counts[key] = id_counts.get(key, 0) + 1
 
+    # Excluir do ranking o bucket de não atribuídos ('0' => "Sem técnico")
+    id_counts.pop('0', None)
+
     if not id_counts:
         return []
 
@@ -410,10 +429,11 @@ def generate_technician_ranking(
     result: List[Dict[str, Any]] = []
     for tech_id_str, count in sorted_items:
         tech_id = safe_int_id(tech_id_str)
-        if tech_id <= 0:
-            tecnico_nome = 'Sem técnico'
-        else:
+        if tech_id > 0:
             tecnico_nome = names_map.get(tech_id) or f"Usuário ID {tech_id}"
+        else:
+            # Não deve ocorrer, pois removemos '0' acima; manter fallback defensivo
+            continue
         result.append({'tecnico': tecnico_nome, 'tickets': count})
 
     return result

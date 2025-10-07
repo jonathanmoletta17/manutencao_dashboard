@@ -24,7 +24,10 @@ const fmt = (n: number | undefined | null) =>
     : '-';
 
 export function TechnicianRanking({ items, title = 'Ranking de Técnicos', topN }: TechnicianRankingProps) {
-  const list = (items ?? []).slice(0, topN ?? (items?.length ?? 0));
+  const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  // Defesa em profundidade: ocultar qualquer item identificado como "Sem técnico"
+  const filtered = (items ?? []).filter((it) => normalize(it.tecnico) !== 'sem tecnico');
+  const list = filtered.slice(0, topN ?? filtered.length);
 
   return (
     <Card className="bg-white shadow-sm border-0">

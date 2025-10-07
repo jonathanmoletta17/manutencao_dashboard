@@ -103,6 +103,12 @@ export default function MaintenanceDashboard() {
     const name = stripParentPrefix(rawName ?? '');
     const norm = name.replace(/\s*>\s*/g, ' > ').trim();
     if (!norm) return name;
+    // Caso especial: quando a entidade É exatamente "Origem > Piratini",
+    // manter o nome completo sem abreviar "Origem".
+    const normLower = norm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (normLower === 'origem > piratini') {
+      return norm;
+    }
     const parts = norm.split(' > ').map((p) => p.trim()).filter(Boolean);
     if (parts.length <= 1) return parts[0] ?? name;
     const first = parts[0];
@@ -262,6 +268,10 @@ export default function MaintenanceDashboard() {
     const cons: CategoryRankingItem[] = [];
     const outs: CategoryRankingItem[] = [];
     (categoryRanking ?? []).forEach((item) => {
+      const raw = (item.category_name ?? '').trim();
+      const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      // Ocultar itens inválidos como 'None', 'null' ou vazio
+      if (!raw || norm === 'none' || norm === 'null') return;
       const grp = classifyMacroArea(item.category_name);
       if (grp === 'Manutenção') man.push(item);
       else if (grp === 'Conservação') cons.push(item);
@@ -442,21 +452,23 @@ export default function MaintenanceDashboard() {
                   {`Top ${topN} - Atribuição por Entidades`}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-3 pr-3 flex-1 min-h-0 space-y-3 overflow-y-auto">
-                {(entityRanking ?? []).map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between gap-3 md:gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
-                      <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
-                      <span className="text-sm text-gray-900 font-medium truncate" title={stripParentPrefix(item.entity_name)}>{abbreviateEntityName(item.entity_name)}</span>
+              <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
+                <div className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3">
+                  {(entityRanking ?? []).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-3 md:gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                        <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
+                        <span className="text-sm text-gray-900 font-medium truncate" title={stripParentPrefix(item.entity_name)}>{abbreviateEntityName(item.entity_name)}</span>
+                      </div>
+                      <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0 ml-1 md:ml-2">
+                        {fmt(item.ticket_count)}
+                      </Badge>
                     </div>
-                    <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0 ml-1 md:ml-2">
-                      {fmt(item.ticket_count)}
-                    </Badge>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 {(!entityRanking || entityRanking.length === 0) && (
                   <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
                 )}
@@ -509,22 +521,24 @@ export default function MaintenanceDashboard() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="px-4 pb-3 pr-3 flex-1 min-h-0 space-y-3 overflow-y-auto">
-              {(() => {
-                const items = (
-                  currentCategoryArea === 'Manutenção' ? manCategories :
-                  currentCategoryArea === 'Conservação' ? consCategories : outsCategories
-                ).slice(0, topN);
-                return items.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
-                      <span className="text-sm text-gray-900 font-medium truncate">{item.category_name}</span>
+            <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
+              <div className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3">
+                {(() => {
+                  const items = (
+                    currentCategoryArea === 'Manutenção' ? manCategories :
+                    currentCategoryArea === 'Conservação' ? consCategories : outsCategories
+                  ).slice(0, topN);
+                  return items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
+                        <span className="text-sm text-gray-900 font-medium truncate">{item.category_name}</span>
+                      </div>
+                      <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0">{fmt(item.ticket_count)}</Badge>
                     </div>
-                    <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0">{fmt(item.ticket_count)}</Badge>
-                  </div>
-                ));
-              })()}
+                  ));
+                })()}
+              </div>
               {(
                 (!categoryRanking || categoryRanking.length === 0) ||
                 ((currentCategoryArea === 'Manutenção' ? manCategories : (currentCategoryArea === 'Conservação' ? consCategories : outsCategories)).length === 0)
@@ -540,7 +554,7 @@ export default function MaintenanceDashboard() {
           </div>
 
           {/* Coluna Direita - Tickets Novos (largura restaurada) */}
-          <div className="w-135 flex-shrink-0">
+          <div className="w-130 flex-shrink-0">
             <Card className="bg-white shadow-sm border-0 h-full flex flex-col">
               <CardHeader className="pb-3 flex-shrink-0">
                 <div className="flex items-center justify-between">
