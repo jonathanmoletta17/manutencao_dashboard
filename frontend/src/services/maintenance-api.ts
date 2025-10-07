@@ -8,7 +8,7 @@ import type {
 
 // Prefixo da API de manutenção
 // Fallback absoluto para backend local se variável não estiver definida
-const API_BASE_URL = (import.meta as any)?.env?.VITE_API_BASE_URL ?? 'http://127.0.0.1:8011/api/v1';
+const API_BASE_URL = (import.meta as any)?.env?.VITE_API_BASE_URL ?? 'http://127.0.0.1:8010/api/v1';
 
 /**
  * Função genérica para buscar dados da API de Manutenção

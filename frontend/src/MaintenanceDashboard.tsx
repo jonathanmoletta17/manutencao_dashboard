@@ -21,20 +21,24 @@ import { Badge } from "./components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { 
   fetchMaintenanceGeneralStats,
+  fetchMaintenanceStatusTotals,
   fetchMaintenanceNewTickets,
   fetchEntityRanking,
   fetchCategoryRanking
 } from './services/maintenance-api';
 import type { 
   MaintenanceGeneralStats,
+  MaintenanceStatusTotals,
   EntityRankingItem, 
   CategoryRankingItem,
   MaintenanceNewTicketItem 
 } from './types/maintenance-api.d';
 import { DateRangePicker } from './components/DateRangePicker';
+import { TopNSelect } from './components/TopNSelect';
 
 export default function MaintenanceDashboard() {
   const [generalStats, setGeneralStats] = useState<MaintenanceGeneralStats | null>(null);
+  const [statusTotals, setStatusTotals] = useState<MaintenanceStatusTotals | null>(null);
   const [entityRanking, setEntityRanking] = useState<EntityRankingItem[] | null>(null);
   const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
   const [newTickets, setNewTickets] = useState<MaintenanceNewTicketItem[] | null>(null);
@@ -64,70 +68,6 @@ export default function MaintenanceDashboard() {
   const refreshInFlight = useRef(false);
   const dateRangeRef = useRef(dateRange);
   const topNRef = useRef(topN);
-
-  // Dropdown customizado para Top N
-  const TopNSelect = ({ value, onChange }: { value: number; onChange: (n: number) => void }) => {
-    const [open, setOpen] = useState(false);
-    const options = [5, 10, 20, 50];
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    // Fecha apenas ao clicar fora ou pressionar Escape
-    useEffect(() => {
-      if (!open) return;
-      const onPointerDown = (e: PointerEvent) => {
-        const el = containerRef.current;
-        if (el && !el.contains(e.target as Node)) {
-          setOpen(false);
-        }
-      };
-      const onKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') setOpen(false);
-      };
-      document.addEventListener('pointerdown', onPointerDown);
-      document.addEventListener('keydown', onKeyDown);
-      return () => {
-        document.removeEventListener('pointerdown', onPointerDown);
-        document.removeEventListener('keydown', onKeyDown);
-      };
-    }, [open]);
-
-    return (
-      <div ref={containerRef} className="relative">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-white bg-white/10 hover:bg-white/20 border border-white/30 flex items-center gap-2"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span className="font-medium">{value}</span>
-          <ChevronDown className="w-4 h-4 text-white" />
-        </Button>
-        {open && (
-          <div className="absolute right-0 mt-1 w-24 bg-[#5A9BD4]/10 backdrop-blur-sm border border-white/30 rounded-md shadow-lg z-20">
-            <ul className="py-1">
-              {options.map((n) => (
-                <li key={n}>
-                  <button
-                    type="button"
-                    className={`w-full text-left px-3 py-1.5 text-sm text-white ${
-                      n === value ? 'bg-white/20' : 'hover:bg-white/10'
-                    }`}
-                    onClick={() => {
-                      onChange(n);
-                      setOpen(false);
-                    }}
-                  >
-                    {n}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
-  };
   
   useEffect(() => {
     dateRangeRef.current = dateRange;
@@ -204,6 +144,14 @@ export default function MaintenanceDashboard() {
     } catch (err) {
       console.error('Falha ao buscar Tickets Novos:', err);
     }
+
+    // Totais de status (sem filtro de datas) em tempo real
+    try {
+      const st = await fetchMaintenanceStatusTotals();
+      setStatusTotals(st);
+    } catch (err) {
+      console.error('Falha ao buscar totais de status:', err);
+    }
   };
 
   const loadDashboardData = async () => {
@@ -255,6 +203,8 @@ export default function MaintenanceDashboard() {
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Totais de status agora são atualizados junto ao polling em loadDashboardDataWith
 
   // ====== Classificação por macro área e carrossel ======
   const removeDiacritics = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
@@ -341,7 +291,7 @@ export default function MaintenanceDashboard() {
       {/* Content - Layout otimizado para tela cheia */}
       <div className="p-6 h-[calc(100vh-64px)] flex flex-col gap-4 overflow-hidden">
         {/* Stats Gerais - Linha superior (período selecionado) */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-5 gap-3">
           <Card className="bg-white border-l-4 border-l-[#5A9BD4] shadow-sm">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
@@ -351,6 +301,21 @@ export default function MaintenanceDashboard() {
                 </div>
                 <div className="w-10 h-10 p-1 bg-[#5A9BD4]/10 rounded-xl flex items-center justify-center shrink-0">
                   <TrendingUp className="w-5 h-5 text-[#5A9BD4]" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Em atendimento (status 2 - atribuído/em progresso) */}
+          <Card className="bg-white border-l-4 border-l-sky-500 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Em atendimento</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.em_atendimento)}</p>
+                </div>
+                <div className="w-10 h-10 p-1 bg-sky-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-sky-600" />
                 </div>
               </div>
             </CardContent>

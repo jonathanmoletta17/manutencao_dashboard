@@ -37,6 +37,7 @@ def generate_maintenance_stats(
         uid_cols=False
     )
 
+
     # Pendentes (status 4)
     criteria_pendentes = [
         {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '4'},
@@ -177,11 +178,13 @@ def generate_status_totals(
         uid_cols=False
     )
 
-    nao_solucionados = len(status2_data) + len(status4_data)
+    em_atendimento = len(status2_data)
+    nao_solucionados = em_atendimento + len(status4_data)
     resolvidos = len(solucionados_data) + len(fechados_data)
 
     return {
         'novos': len(novos_data),
+        'em_atendimento': em_atendimento,
         'nao_solucionados': nao_solucionados,
         'planejados': len(planejados_data),
         'solucionados': len(solucionados_data),

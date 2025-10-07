@@ -9,6 +9,7 @@ export interface MaintenanceGeneralStats {
 
 export interface MaintenanceStatusTotals {
   novos: number;
+  em_atendimento: number;
   nao_solucionados: number;
   planejados: number;
   solucionados: number;

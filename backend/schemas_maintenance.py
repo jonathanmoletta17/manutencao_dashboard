@@ -16,6 +16,7 @@ class MaintenanceGeneralStats(BaseModel):
 class MaintenanceStatusTotals(BaseModel):
     """Totais gerais por status, alinhados ao script PowerShell."""
     novos: int
+    em_atendimento: int   # (2)
     nao_solucionados: int  # (2 + 4)
     planejados: int        # (3)
     solucionados: int      # (5)
