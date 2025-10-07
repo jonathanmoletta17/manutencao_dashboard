@@ -2,7 +2,8 @@ import {
   useState, 
   useEffect,
   useRef,
-  useMemo
+  useMemo,
+  useCallback
 } from 'react';
 import {
   RotateCcw,
@@ -95,6 +96,37 @@ export default function MaintenanceDashboard() {
     return s;
   };
 
+  // Abreviação: usar apenas o primeiro e o último segmento, abreviando o primeiro por sigla conhecida ou acrônimo
+  const abbreviateEntityName = (rawName: string) => {
+    const name = stripParentPrefix(rawName ?? '');
+    const norm = name.replace(/\s*>\s*/g, ' > ').trim();
+    if (!norm) return name;
+    const parts = norm.split(' > ').map((p) => p.trim()).filter(Boolean);
+    if (parts.length <= 1) return parts[0] ?? name;
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const SIGLAS_PRIMEIRO: Record<string, string> = {
+      'casa civil': 'CC',
+      'gabinete do governador': 'GG',
+      'gabinete do vice-governador': 'GVG',
+      'secom': 'SECOM',
+      'casa militar': 'CM',
+    };
+    const firstKey = normalize(first);
+    let sigla = SIGLAS_PRIMEIRO[firstKey];
+    if (!sigla) {
+      const stop = new Set(['da','de','do','dos','das','e']);
+      const words = firstKey.split(/\s+/).filter((w) => w && !stop.has(w));
+      sigla = words.filter((w) => w.length >= 3).map((w) => w[0]).join('').slice(0,4).toUpperCase();
+      if (!sigla) sigla = (first.trim().slice(0,3) || first).toUpperCase();
+    }
+
+    if (!last || normalize(last) === firstKey) return first; // evita duplicação
+    return `${sigla} > ${last}`;
+  };
+
   const applyDateRange = () => {
     const { inicio, fim } = dateRangeRef.current;
     const url = new URL(window.location.href);
@@ -160,13 +192,17 @@ export default function MaintenanceDashboard() {
     // Em atendimento agora vem do stats-gerais (com filtro de datas)
   };
 
+  // Wrapper para recarregar dados usando o intervalo atual
   const loadDashboardData = async () => {
     const { inicio, fim } = dateRangeRef.current;
     await loadDashboardDataWith(inicio, fim);
   };
 
   useEffect(() => {
-    loadDashboardData();
+    (async () => {
+      const { inicio, fim } = dateRangeRef.current;
+      await loadDashboardDataWith(inicio, fim);
+    })();
   }, []);
 
   // Atualizar dados quando Top N mudar
@@ -184,7 +220,8 @@ export default function MaintenanceDashboard() {
 
   // Polling configurável via .env (usa apenas VITE_REALTIME_POLL_INTERVAL_SEC)
   useEffect(() => {
-    const rawPollSec = (import.meta as any)?.env?.VITE_REALTIME_POLL_INTERVAL_SEC;
+    const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+    const rawPollSec = env?.VITE_REALTIME_POLL_INTERVAL_SEC;
     const intervalMs = rawPollSec !== undefined ? Number(rawPollSec) * 1000 : 15000;
     const id = setInterval(async () => {
       if (refreshInFlight.current) return;
@@ -209,14 +246,14 @@ export default function MaintenanceDashboard() {
 
   // ====== Classificação por macro área e carrossel ======
   const removeDiacritics = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
-  const classifyMacroArea = (label: string) => {
+  const classifyMacroArea = useCallback((label: string) => {
     if (!label) return 'Outros' as const;
     const first = label.split('>', 1)[0].trim();
     const plain = removeDiacritics(first).toLowerCase();
     if (plain.startsWith('manutencao')) return 'Manutenção' as const;
     if (plain.startsWith('conservacao')) return 'Conservação' as const;
     return 'Outros' as const;
-  };
+  }, []);
 
   const { manCategories, consCategories, outsCategories } = useMemo(() => {
     const man: CategoryRankingItem[] = [];
@@ -233,13 +270,14 @@ export default function MaintenanceDashboard() {
     cons.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
     outs.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
     return { manCategories: man, consCategories: cons, outsCategories: outs };
-  }, [categoryRanking]);
+  }, [categoryRanking, classifyMacroArea]);
 
   const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação' | 'Outros'>('Manutenção');
 
   useEffect(() => {
-    const rawCarouselMs = (import.meta as any)?.env?.VITE_CATEGORY_CAROUSEL_INTERVAL_MS;
-    const rawCarouselSec = (import.meta as any)?.env?.VITE_CATEGORY_CAROUSEL_INTERVAL_SEC;
+    const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+    const rawCarouselMs = env?.VITE_CATEGORY_CAROUSEL_INTERVAL_MS;
+    const rawCarouselSec = env?.VITE_CATEGORY_CAROUSEL_INTERVAL_SEC;
     const intervalMs = rawCarouselMs !== undefined
       ? Number(rawCarouselMs)
       : rawCarouselSec !== undefined
@@ -369,9 +407,6 @@ export default function MaintenanceDashboard() {
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Coluna Esquerda - Rankings (flexível) */}
           <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4">
-            {/* Ranking Técnicos */}
-            <TechnicianRanking items={technicianRanking} topN={topN} />
-            {/* Ranking Entidades */}
             <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
               <CardHeader className="pb-2 flex-none">
                 <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
@@ -387,7 +422,7 @@ export default function MaintenanceDashboard() {
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
                       <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
-                      <span className="text-sm text-gray-900 font-medium truncate">{stripParentPrefix(item.entity_name)}</span>
+                      <span className="text-sm text-gray-900 font-medium truncate" title={stripParentPrefix(item.entity_name)}>{abbreviateEntityName(item.entity_name)}</span>
                     </div>
                     <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0 ml-1 md:ml-2">
                       {fmt(item.ticket_count)}
@@ -432,6 +467,9 @@ export default function MaintenanceDashboard() {
               )}
             </CardContent>
           </Card>
+            {/* Ranking Técnicos */}
+            <TechnicianRanking items={technicianRanking} topN={topN} />
+            {/* Ranking Entidades */}
           </div>
 
           {/* Coluna Direita - Tickets Novos (largura restaurada) */}
