@@ -38,6 +38,21 @@ def generate_maintenance_stats(
     )
 
 
+    # Em atendimento (status 2 - Atribuído/Em progresso)
+    criteria_em_atendimento = [
+        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '2'},
+        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
+        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
+    ]
+    em_atendimento_data = glpi_client.search_paginated(
+        headers=session_headers,
+        api_url=api_url,
+        itemtype='Ticket',
+        criteria=criteria_em_atendimento,
+        forcedisplay=[FIELD_ID],
+        uid_cols=False
+    )
+
     # Pendentes (status 4)
     criteria_pendentes = [
         {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '4'},
@@ -101,6 +116,7 @@ def generate_maintenance_stats(
 
     return {
         'novos': len(novos_data),
+        'em_atendimento': len(em_atendimento_data),
         'pendentes': len(pendentes_data),
         'planejados': len(planejados_data),
         'resolvidos': (len(resolvidos_5_data) + len(resolvidos_6_data))

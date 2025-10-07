@@ -91,8 +91,8 @@ def get_maintenance_general_stats(inicio: str, fim: str):
         result = MaintenanceGeneralStats(**stats)
         cache.set(cache_key, result)
         logger.info(
-            "endpoint=/manutencao/stats-gerais inicio=%s fim=%s novos=%d pendentes=%d planejados=%d resolvidos=%d",
-            inicio, fim, stats['novos'], stats['pendentes'], stats['planejados'], stats['resolvidos']
+            "endpoint=/manutencao/stats-gerais inicio=%s fim=%s novos=%d em_atendimento=%d pendentes=%d planejados=%d resolvidos=%d",
+            inicio, fim, stats['novos'], stats.get('em_atendimento', 0), stats['pendentes'], stats['planejados'], stats['resolvidos']
         )
         return result
 

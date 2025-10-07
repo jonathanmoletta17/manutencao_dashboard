@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class MaintenanceGeneralStats(BaseModel):
     """Estatísticas gerais de tickets de manutenção por status."""
     novos: int
+    em_atendimento: int
     pendentes: int
     planejados: int
     resolvidos: int

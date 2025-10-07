@@ -27,7 +27,7 @@ def get_new_tickets(limit: Optional[int] = 10):
     if cached:
         return cached
 
-    API_URL = os.getenv("API_URL")
+    API_URL = os.getenv("API_URL") or os.getenv("GLPI_BASE_URL")
     APP_TOKEN = os.getenv("APP_TOKEN") or os.getenv("GLPI_APP_TOKEN")
     USER_TOKEN = os.getenv("USER_TOKEN") or os.getenv("GLPI_USER_TOKEN")
 

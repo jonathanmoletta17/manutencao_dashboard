@@ -1,6 +1,5 @@
 import type {
   MaintenanceGeneralStats,
-  MaintenanceStatusTotals,
   EntityRankingItem,
   CategoryRankingItem,
   MaintenanceNewTicketItem,
@@ -31,10 +30,6 @@ async function fetchFromAPI<T>(endpoint: string): Promise<T> {
 export const fetchMaintenanceGeneralStats = (inicio?: string, fim?: string) => {
   const qs = inicio && fim ? `?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}` : '';
   return fetchFromAPI<MaintenanceGeneralStats>(`/manutencao/stats-gerais${qs}`);
-};
-
-export const fetchMaintenanceStatusTotals = () => {
-  return fetchFromAPI<MaintenanceStatusTotals>(`/manutencao/status-totais`);
 };
 
 export const fetchEntityRanking = (inicio?: string, fim?: string, top: number = 10) => {

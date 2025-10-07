@@ -2,9 +2,15 @@ Manutenção Backend
 
 Endpoints
 
+- `GET /api/v1/manutencao/stats-gerais?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+  - Estatísticas gerais por período, com filtro de datas.
+  - Campos: Novos (1), Em atendimento (2), Pendentes (4), Planejados (3), Resolvidos (5+6).
+  - Usa cache com TTL (`CACHE_TTL_SEC`).
+
 - `GET /api/v1/manutencao/status-totais`
-  - Totais gerais por status (Novos, Não solucionados 2+4, Planejados 3, Solucionados 5, Fechados 6, Resolvidos 5+6).
-  - Sem filtro de datas; usa cache com TTL (`CACHE_TTL_SEC`).
+  - Totais gerais por status, sem filtro de datas.
+  - Campos: Novos (1), Em atendimento (2), Não solucionados (2+4), Planejados (3), Solucionados (5), Fechados (6), Resolvidos (5+6).
+  - Usa cache com TTL (`CACHE_TTL_SEC`).
 
 - `GET /api/v1/manutencao/top-atribuicao-entidades?top=10`
   - Ranking global por entidade com contagem de tickets.

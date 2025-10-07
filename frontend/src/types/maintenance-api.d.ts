@@ -2,18 +2,9 @@
 
 export interface MaintenanceGeneralStats {
   novos: number;
+  em_atendimento: number;
   pendentes: number;
   planejados: number;
-  resolvidos: number;
-}
-
-export interface MaintenanceStatusTotals {
-  novos: number;
-  em_atendimento: number;
-  nao_solucionados: number;
-  planejados: number;
-  solucionados: number;
-  fechados: number;
   resolvidos: number;
 }
 

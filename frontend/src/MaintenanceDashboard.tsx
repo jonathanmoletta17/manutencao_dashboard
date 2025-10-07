@@ -14,21 +14,18 @@ import {
   Building2,
   FolderKanban,
   Ticket,
-  ChevronDown,
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { 
   fetchMaintenanceGeneralStats,
-  fetchMaintenanceStatusTotals,
   fetchMaintenanceNewTickets,
   fetchEntityRanking,
   fetchCategoryRanking
 } from './services/maintenance-api';
 import type { 
   MaintenanceGeneralStats,
-  MaintenanceStatusTotals,
   EntityRankingItem, 
   CategoryRankingItem,
   MaintenanceNewTicketItem 
@@ -38,7 +35,7 @@ import { TopNSelect } from './components/TopNSelect';
 
 export default function MaintenanceDashboard() {
   const [generalStats, setGeneralStats] = useState<MaintenanceGeneralStats | null>(null);
-  const [statusTotals, setStatusTotals] = useState<MaintenanceStatusTotals | null>(null);
+  
   const [entityRanking, setEntityRanking] = useState<EntityRankingItem[] | null>(null);
   const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
   const [newTickets, setNewTickets] = useState<MaintenanceNewTicketItem[] | null>(null);
@@ -145,13 +142,7 @@ export default function MaintenanceDashboard() {
       console.error('Falha ao buscar Tickets Novos:', err);
     }
 
-    // Totais de status (sem filtro de datas) em tempo real
-    try {
-      const st = await fetchMaintenanceStatusTotals();
-      setStatusTotals(st);
-    } catch (err) {
-      console.error('Falha ao buscar totais de status:', err);
-    }
+    // Em atendimento agora vem do stats-gerais (com filtro de datas)
   };
 
   const loadDashboardData = async () => {
@@ -176,15 +167,10 @@ export default function MaintenanceDashboard() {
     window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
   }, [topN]);
 
-  // Polling configurável via .env
+  // Polling configurável via .env (usa apenas VITE_REALTIME_POLL_INTERVAL_SEC)
   useEffect(() => {
-    const rawPollMs = (import.meta as any)?.env?.VITE_REALTIME_POLL_INTERVAL_MS;
     const rawPollSec = (import.meta as any)?.env?.VITE_REALTIME_POLL_INTERVAL_SEC;
-    const intervalMs = rawPollMs !== undefined
-      ? Number(rawPollMs)
-      : rawPollSec !== undefined
-        ? Number(rawPollSec) * 1000
-        : 15000;
+    const intervalMs = rawPollSec !== undefined ? Number(rawPollSec) * 1000 : 15000;
     const id = setInterval(async () => {
       if (refreshInFlight.current) return;
       refreshInFlight.current = true;
@@ -306,13 +292,13 @@ export default function MaintenanceDashboard() {
             </CardContent>
           </Card>
 
-          {/* Em atendimento (status 2 - atribuído/em progresso) */}
+          {/* Em atendimento (status 2 - atribuído/em progresso) por período */}
           <Card className="bg-white border-l-4 border-l-sky-500 shadow-sm">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Em atendimento</p>
-                  <p className="text-xl font-semibold text-gray-900">{fmt(statusTotals?.em_atendimento)}</p>
+                  <p className="text-xl font-semibold text-gray-900">{fmt(generalStats?.em_atendimento)}</p>
                 </div>
                 <div className="w-10 h-10 p-1 bg-sky-100 rounded-xl flex items-center justify-center shrink-0">
                   <Clock className="w-5 h-5 text-sky-600" />
