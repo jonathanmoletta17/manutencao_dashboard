@@ -255,18 +255,17 @@ export default function MaintenanceDashboard() {
   // ====== Classificação por macro área e carrossel ======
   const removeDiacritics = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
   const classifyMacroArea = useCallback((label: string) => {
-    if (!label) return 'Outros' as const;
+    if (!label) return null;
     const first = label.split('>', 1)[0].trim();
     const plain = removeDiacritics(first).toLowerCase();
     if (plain.startsWith('manutencao')) return 'Manutenção' as const;
     if (plain.startsWith('conservacao')) return 'Conservação' as const;
-    return 'Outros' as const;
+    return null;
   }, []);
 
-  const { manCategories, consCategories, outsCategories } = useMemo(() => {
+  const { manCategories, consCategories } = useMemo(() => {
     const man: CategoryRankingItem[] = [];
     const cons: CategoryRankingItem[] = [];
-    const outs: CategoryRankingItem[] = [];
     (categoryRanking ?? []).forEach((item) => {
       const raw = (item.category_name ?? '').trim();
       const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -275,17 +274,16 @@ export default function MaintenanceDashboard() {
       const grp = classifyMacroArea(item.category_name);
       if (grp === 'Manutenção') man.push(item);
       else if (grp === 'Conservação') cons.push(item);
-      else outs.push(item);
+      // Ignora itens fora das macro áreas conhecidas
     });
     // ordenar por ticket_count desc para garantir Top 5 correto por grupo
     man.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
     cons.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
-    outs.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
-    return { manCategories: man, consCategories: cons, outsCategories: outs };
+    return { manCategories: man, consCategories: cons };
   }, [categoryRanking, classifyMacroArea]);
 
-  const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação' | 'Outros'>('Manutenção');
-  const areas: ReadonlyArray<'Manutenção' | 'Conservação' | 'Outros'> = ['Manutenção', 'Conservação', 'Outros'] as const;
+  const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação'>('Manutenção');
+  const areas: ReadonlyArray<'Manutenção' | 'Conservação'> = ['Manutenção', 'Conservação'] as const;
   const pauseUntilRef = useRef<number>(0);
   const PAUSE_MS = 20000;
   const schedulePause = useCallback(() => {
@@ -321,7 +319,7 @@ export default function MaintenanceDashboard() {
         : 15000;
     const id = setInterval(() => {
       if (Date.now() < pauseUntilRef.current) return;
-      setCurrentCategoryArea((prev) => (prev === 'Manutenção' ? 'Conservação' : (prev === 'Conservação' ? 'Outros' : 'Manutenção')));
+      setCurrentCategoryArea((prev) => (prev === 'Manutenção' ? 'Conservação' : 'Manutenção'));
     }, intervalMs);
     return () => clearInterval(id);
   }, []);
@@ -525,8 +523,7 @@ export default function MaintenanceDashboard() {
               <div className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3">
                 {(() => {
                   const items = (
-                    currentCategoryArea === 'Manutenção' ? manCategories :
-                    currentCategoryArea === 'Conservação' ? consCategories : outsCategories
+                    currentCategoryArea === 'Manutenção' ? manCategories : consCategories
                   ).slice(0, topN);
                   return items.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -541,7 +538,7 @@ export default function MaintenanceDashboard() {
               </div>
               {(
                 (!categoryRanking || categoryRanking.length === 0) ||
-                ((currentCategoryArea === 'Manutenção' ? manCategories : (currentCategoryArea === 'Conservação' ? consCategories : outsCategories)).length === 0)
+                ((currentCategoryArea === 'Manutenção' ? manCategories : consCategories).length === 0)
               ) && (
                 <div className="text-center text-xs text-gray-500 py-4">Sem itens nesta área no período</div>
               )}
