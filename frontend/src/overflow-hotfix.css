@@ -1,0 +1,28 @@
+/* Hotfix imediato: prevenir scroll global e organizar área rolável */
+/* 🔒 impede scroll na página inteira */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-y: hidden; /* chave do hotfix */
+}
+
+/* 🧱 garante que tudo meça “por dentro” e evita somar 1px perdido */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* 🖥️ estrutura base de página em tela cheia */
+#root, .app { min-height: 100vh; }
+
+/* Se houver um wrapper principal, aplica isso nele */
+.main {
+  height: 100vh; /* ou 100dvh em navegadores suportados */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Onde queres o scroll (ex.: o “reader”) */
+.main .content, #reader, .scroll-area  {
+  flex: 1 1 auto;
+  overflow: auto; /* só aqui pode rolar */
+  -webkit-overflow-scrolling: touch;
+}
