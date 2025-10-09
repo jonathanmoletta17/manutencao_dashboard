@@ -1,9 +1,6 @@
 import { 
   useState, 
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback
+  useEffect
 } from 'react';
 import {
   RotateCcw,
@@ -107,7 +104,8 @@ export default function MaintenanceDashboard() {
       {/* Erros globais do dashboard (ponto único de exibição) */}
       {error && (
         <div className="px-6 py-2 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm">
-          {error}
+          <span className="font-medium">Falha ao carregar dados do dashboard.</span> Tente novamente.
+          <span className="ml-2 opacity-80">Detalhes: {error}</span>
         </div>
       )}
 

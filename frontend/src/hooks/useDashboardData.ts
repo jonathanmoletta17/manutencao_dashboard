@@ -30,6 +30,8 @@ export function useDashboardData(dateRange: DateRange, topN: number) {
   const refreshInFlight = useRef(false);
   const dateRangeRef = useRef(dateRange);
   const topNRef = useRef(topN);
+  // Cache leve para ranking de técnicos com TTL curto
+  const techCacheRef = useRef<{ key: string; data: TechnicianRankingItem[]; ts: number } | null>(null);
 
   useEffect(() => {
     dateRangeRef.current = dateRange;
@@ -47,30 +49,46 @@ export function useDashboardData(dateRange: DateRange, topN: number) {
     try {
       setError(null);
       // Paraleliza chamadas independentes
+      const getTechnicianRanking = async () => {
+        const key = `${inicio}|${fim}|${top}`;
+        const ttlMs = 5000; // reutiliza resultado por até 5s se parâmetros não mudarem
+        const cached = techCacheRef.current;
+        const now = Date.now();
+        if (cached && cached.key === key && (now - cached.ts) < ttlMs) {
+          return cached.data;
+        }
+        const data = await fetchTechnicianRanking(inicio, fim, top);
+        techCacheRef.current = { key, data, ts: now };
+        return data;
+      };
+
       const results = await Promise.allSettled([
         fetchMaintenanceGeneralStats(inicio, fim),
         fetchEntityRanking(inicio, fim, top),
         fetchCategoryRanking(inicio, fim, Math.max(top * 3, 15)),
         fetchMaintenanceNewTickets(8),
-        fetchTechnicianRanking(inicio, fim, top),
+        getTechnicianRanking(),
       ]);
 
       const [gsRes, erRes, crRes, ntRes, tkRes] = results;
+      let firstError: string | null = null;
 
       if (gsRes.status === 'fulfilled') setGeneralStats(gsRes.value);
-      else setError(String(gsRes.reason));
+      else firstError = firstError ?? String(gsRes.reason);
 
       if (erRes.status === 'fulfilled') setEntityRanking(erRes.value);
-      else if (!error) setError(String(erRes.reason));
+      else firstError = firstError ?? String(erRes.reason);
 
       if (crRes.status === 'fulfilled') setCategoryRanking(crRes.value);
-      else if (!error) setError(String(crRes.reason));
+      else firstError = firstError ?? String(crRes.reason);
 
       if (ntRes.status === 'fulfilled') setNewTickets(ntRes.value);
-      else if (!error) setError(String(ntRes.reason));
+      else firstError = firstError ?? String(ntRes.reason);
 
       if (tkRes.status === 'fulfilled') setTechnicianRanking(tkRes.value);
-      else if (!error) setError(String(tkRes.reason));
+      else firstError = firstError ?? String(tkRes.reason);
+
+      if (firstError) setError(firstError);
     } finally {
       refreshInFlight.current = false;
     }

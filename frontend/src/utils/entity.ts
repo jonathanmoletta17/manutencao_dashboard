@@ -1,4 +1,4 @@
-import { normalizeArrowSpaces, removeDiacritics, toKeyLower } from './strings';
+import { normalizeArrowSpaces, toKeyLower } from './strings';
 
 const PARENT = 'Origem > PIRATINI';
 const PARENT_KEY = toKeyLower(PARENT);

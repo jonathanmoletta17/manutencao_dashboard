@@ -4,6 +4,17 @@ import { ALLOWED_TOP } from '../constants/top';
 
 const toYmd = (d: Date) => d.toISOString().slice(0, 10);
 
+// Cache simples para garantir identidade estável de objetos DateRange
+const dateRangeCache = new Map<string, Readonly<DateRange>>();
+const getStableDateRange = (inicio: string, fim: string): Readonly<DateRange> => {
+  const key = `${inicio}|${fim}`;
+  const cached = dateRangeCache.get(key);
+  if (cached) return cached;
+  const obj = Object.freeze({ inicio, fim });
+  dateRangeCache.set(key, obj);
+  return obj;
+};
+
 export interface DateRange {
   inicio: string;
   fim: string;
@@ -34,11 +45,11 @@ export function readDateRangeFromUrl(href: string, fallback?: DateRange): DateRa
     const qsInicio = url.searchParams.get('inicio');
     const qsFim = url.searchParams.get('fim');
     if (qsInicio && qsFim && qsInicio <= qsFim) {
-      return { inicio: qsInicio, fim: qsFim };
+      return getStableDateRange(qsInicio, qsFim);
     }
-    return def;
+    return getStableDateRange(def.inicio, def.fim);
   } catch {
-    return def;
+    return getStableDateRange(def.inicio, def.fim);
   }
 }
 
