@@ -184,7 +184,7 @@ export default function MaintenanceDashboard() {
         {/* Conteúdo principal em duas colunas: Rankings à esquerda, Tickets Novos à direita */}
         <div className="flex gap-4 flex-1 min-h-0">
           {/* Coluna esquerda: Rankings (Entidades e Categorias lado a lado) */}
-          <div className="flex-1 min-w-0 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex-1 min-w-0 min-h-0 grid grid-cols-2 gap-4">
             {/* Ranking por Entidades */}
             <Card className="bg-white shadow-sm border-0 min-h-0 flex flex-col overflow-hidden">
               <CardHeader className="pb-2 flex-none">
