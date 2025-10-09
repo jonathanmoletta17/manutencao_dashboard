@@ -181,43 +181,93 @@ export default function MaintenanceDashboard() {
           </Card>
         </div>
 
-        {/* Main Content - 2 colunas */}
-        <div className="flex gap-4 flex-1 min-h-0">
-          {/* Coluna Esquerda - Rankings (flexível) */}
-          <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4">
-            <div className="flex gap-4 min-w-0 flex-1 min-h-0">
-            <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
-              <CardHeader className="pb-2 flex-none">
-                <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
-                  <Building2 className="w-4 h-4" />
-                  {`Ranking por Entidades`}
+        {/* Tickets Novos - Topo (largura total) */}
+        <div className="w-full">
+          <Card className="bg-white shadow-sm border-0 flex flex-col">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-lg">
+                  <Ticket className="w-5 h-5" />
+                  Tickets Novos
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
-                <div className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3">
-                  {(entityRanking ?? []).map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between gap-3 md:gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
-                        <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
-                        <span className="text-sm text-gray-900 font-medium truncate" title={stripParentPrefix(item.entity_name)}>{abbreviateEntityName(item.entity_name)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">{newTickets ? `${newTickets.length} tickets` : '0 tickets'}</span>
+                  <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100" onClick={refresh}>
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div 
+                className="max-h-[360px] overflow-y-auto px-6 pb-6 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
+              >
+                <div className="space-y-3">
+                  {(newTickets ?? []).map((item) => (
+                    <div key={item.id} className="border-l-4 border-[#5A9BD4] bg-[#5A9BD4]/5 p-3 rounded-r-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded">#{item.id ?? '-'}</span>
+                        <Badge variant="outline" className="border-[#5A9BD4] text-[#5A9BD4] bg-[#5A9BD4]/10 text-xs">Novo</Badge>
                       </div>
-                      <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0 ml-1 md:ml-2">
-                        {fmt(item.ticket_count)}
-                      </Badge>
+                      <h4 className="font-medium text-gray-900 mb-2 text-sm truncate" title={item.titulo}>{item.titulo}</h4>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700 font-medium truncate" title={item.solicitante}>{item.solicitante}</span>
+                        <div className="flex flex-col items-end w-48">
+                          {(() => { const { time, date } = fmtDateTimeParts(item.data); return (
+                            <>
+                              <span className="text-gray-600 whitespace-nowrap">{time}</span>
+                              <span className="text-gray-600 whitespace-nowrap">{date}</span>
+                            </>
+                          ); })()}
+                        </div>
+                      </div>
                     </div>
                   ))}
+                  {(!newTickets || newTickets.length === 0) && (
+                    <div className="w-full text-center text-xs text-gray-600 py-2">Sem tickets novos</div>
+                  )}
                 </div>
-                {(!entityRanking || entityRanking.length === 0) && (
-                  <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-            {/* Ranking Categorias */}
-            <Card className="bg-white shadow-sm border-0 flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* Área de Rankings - largura total com Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0">
+          {/* Ranking por Entidades */}
+          <Card className="bg-white shadow-sm border-0 min-h-0 flex flex-col overflow-hidden">
+            <CardHeader className="pb-2 flex-none">
+              <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
+                <Building2 className="w-4 h-4" />
+                {`Ranking por Entidades`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
+              <div className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3">
+                {(entityRanking ?? []).map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-3 md:gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                      <span className="text-xs font-bold text-gray-600 w-7">#{idx + 1}</span>
+                      <span className="text-sm text-gray-900 font-medium truncate" title={stripParentPrefix(item.entity_name)}>{abbreviateEntityName(item.entity_name)}</span>
+                    </div>
+                    <Badge className="bg-[#5A9BD4] text-white text-xs px-3 py-1 rounded-md shrink-0 ml-1 md:ml-2">
+                      {fmt(item.ticket_count)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              {(!entityRanking || entityRanking.length === 0) && (
+                <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Ranking por Categorias */}
+          <Card className="bg-white shadow-sm border-0 min-h-0 flex flex-col overflow-hidden">
             <CardHeader className="pb-2 flex-none">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
@@ -300,62 +350,10 @@ export default function MaintenanceDashboard() {
               ) : null}
             </CardContent>
           </Card>
-            </div>
-            {/* Ranking Técnicos */}
-            <TechnicianRanking items={technicianRanking} />
-            {/* Ranking Entidades */}
-          </div>
 
-          {/* Coluna Direita - Tickets Novos (largura restaurada) */}
-          <div className="w-130 flex-shrink-0">
-            <Card className="bg-white shadow-sm border-0 h-full flex flex-col">
-              <CardHeader className="pb-3 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-lg">
-                    <Ticket className="w-5 h-5" />
-                    Tickets Novos
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">{newTickets ? `${newTickets.length} tickets` : '0 tickets'}</span>
-                    <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100" onClick={refresh}>
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-hidden p-0">
-                <div 
-                  className="h-full overflow-y-auto px-6 pb-6 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
-                >
-                  <div className="space-y-3">
-                    {(newTickets ?? []).map((item) => (
-                      <div key={item.id} className="border-l-4 border-[#5A9BD4] bg-[#5A9BD4]/5 p-3 rounded-r-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded">#{item.id ?? '-'}</span>
-                          <Badge variant="outline" className="border-[#5A9BD4] text-[#5A9BD4] bg-[#5A9BD4]/10 text-xs">Novo</Badge>
-                        </div>
-                        <h4 className="font-medium text-gray-900 mb-2 text-sm truncate" title={item.titulo}>{item.titulo}</h4>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-gray-700 font-medium truncate" title={item.solicitante}>{item.solicitante}</span>
-                          <div className="flex flex-col items-end w-48">
-                            {(() => { const { time, date } = fmtDateTimeParts(item.data); return (
-                              <>
-                                <span className="text-gray-600 whitespace-nowrap">{time}</span>
-                                <span className="text-gray-600 whitespace-nowrap">{date}</span>
-                              </>
-                            ); })()}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {(!newTickets || newTickets.length === 0) && (
-                      <div className="w-full text-center text-xs text-gray-600 py-2">Sem tickets novos</div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Ranking Técnicos - ocupa toda a largura no Grid */}
+          <div className="md:col-span-2">
+            <TechnicianRanking items={technicianRanking} />
           </div>
         </div>
       </div>

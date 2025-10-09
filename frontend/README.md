@@ -91,3 +91,13 @@ Observações operacionais:
 
 - Removido `src/components/TopNSelect.tsx` por não ser utilizado no `MaintenanceDashboard` (o dashboard exibe todos os itens dos rankings).
 - Padronizada a leitura/persistência do modo de categorias via `cat=orig|agg` na URL.
+
+## Mudanças de layout
+
+- Reposicionamento dos Tickets Novos para a linha superior e expansão do Ranking de Técnicos para ocupar toda a largura disponível, mantendo responsividade:
+  - Arquivo: `src/MaintenanceDashboard.tsx`
+  - Ajustes:
+    - Substituição do layout de duas colunas por uma seção superior para “Tickets Novos” em largura total.
+    - Conversão da área de rankings para `CSS Grid` (`grid-cols-1 md:grid-cols-2`) com `TechnicianRanking` ocupando ambas as colunas (`md:col-span-2`).
+    - Limitação de altura e rolagem vertical na lista de tickets (`max-h-[360px]` + `overflow-y-auto`) para preservar harmonia visual.
+  - Objetivo: melhorar a legibilidade do Ranking de Técnicos e utilizar toda a largura do contêiner, sem comprometer a hierarquia e o espaçamento dos blocos.
