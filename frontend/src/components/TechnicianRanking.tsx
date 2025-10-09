@@ -7,7 +7,6 @@ import type { TechnicianRankingItem } from "../types/maintenance-api.d";
 interface TechnicianRankingProps {
   items: TechnicianRankingItem[] | null;
   title?: string;
-  topN?: number;
 }
 
 const shortName = (name: string) => {
@@ -21,11 +20,11 @@ const shortName = (name: string) => {
 
 // usa utilitário compartilhado fmt
 
-export function TechnicianRanking({ items, title = 'Ranking de Técnicos', topN }: TechnicianRankingProps) {
+export function TechnicianRanking({ items, title = 'Ranking de Técnicos' }: TechnicianRankingProps) {
   const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   // Defesa em profundidade: ocultar qualquer item identificado como "Sem técnico"
   const filtered = (items ?? []).filter((it) => normalize(it.tecnico) !== 'sem tecnico');
-  const list = filtered.slice(0, topN ?? filtered.length);
+  const list = filtered;
 
   return (
     <Card className="bg-white shadow-sm border-0">

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { removeDiacritics } from '../utils/strings';
 import type { CategoryRankingItem } from '../types/maintenance-api.d';
+import { transformCategoryRanking } from '../utils/categories';
 
 export type MacroArea = 'Manutenção' | 'Conservação';
 
@@ -18,22 +19,18 @@ export function classifyMacroArea(label: string | undefined | null): MacroArea |
 /**
  * Agrupa categorias por macro área, filtrando valores inválidos e ordenando por `ticket_count` desc.
  */
-export function useCategoryGrouping(categoryRanking: CategoryRankingItem[] | null) {
+export function useCategoryGrouping(
+  categoryRanking: CategoryRankingItem[] | null,
+  mode: 'original' | 'aggregated' = 'original',
+) {
   return useMemo(() => {
-    const man: CategoryRankingItem[] = [];
-    const cons: CategoryRankingItem[] = [];
-    (categoryRanking ?? []).forEach((item) => {
-      const raw = (item.category_name ?? '').trim();
+    const items = (categoryRanking ?? []).filter((it) => {
+      const raw = (it.category_name ?? '').trim();
       const norm = removeDiacritics(raw).toLowerCase();
-      // Ocultar itens inválidos como 'None', 'null' ou vazio
-      if (!raw || norm === 'none' || norm === 'null') return;
-      const grp = classifyMacroArea(item.category_name);
-      if (grp === 'Manutenção') man.push(item);
-      else if (grp === 'Conservação') cons.push(item);
-      // Ignora itens fora das macro áreas conhecidas
+      return Boolean(raw) && norm !== 'none' && norm !== 'null';
     });
-    man.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
-    cons.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
+    const man = transformCategoryRanking(items, 'Manutenção', mode);
+    const cons = transformCategoryRanking(items, 'Conservação', mode);
     return { manCategories: man, consCategories: cons };
-  }, [categoryRanking]);
+  }, [categoryRanking, mode]);
 }

@@ -9,11 +9,11 @@ Endpoints
 
 <!-- Endpoint removido por duplicidade com métricas por período (stats-gerais) -->
 
-- `GET /api/v1/manutencao/top-atribuicao-entidades?top=10`
+- `GET /api/v1/manutencao/top-atribuicao-entidades?top=10` (omita `top` ou use `top=0` para todos)
   - Ranking global por entidade com contagem de tickets.
   - Implementa busca de IDs brutos (`display_type=2`) e mapeamento para nomes completos.
 
-- `GET /api/v1/manutencao/top-atribuicao-categorias?top=10`
+- `GET /api/v1/manutencao/top-atribuicao-categorias?top=10` (omita `top` ou use `top=0` para todos)
   - Ranking global por categoria com contagem de tickets.
   - Espelha o script `top_categories.ps1`: busca IDs brutos (`display_type=2`), conta por ID e mapeia para `ITILCategory.completename`/`name`.
 

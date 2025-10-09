@@ -37,9 +37,9 @@ Este documento descreve, de forma objetiva, como configurar, instalar e executar
 
 ## Endpoints principais
 - Stats gerais: `GET /api/v1/manutencao/stats-gerais?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
-- Ranking entidades: `GET /api/v1/manutencao/ranking-entidades?inicio=YYYY-MM-DD&fim=YYYY-MM-DD&top=5`
-- Ranking categorias: `GET /api/v1/manutencao/ranking-categorias?inicio=YYYY-MM-DD&fim=YYYY-MM-DD&top=5`
-- Ranking técnicos: `GET /api/v1/manutencao/ranking-tecnicos?inicio=YYYY-MM-DD&fim=YYYY-MM-DD&top=5`
+- Ranking entidades: `GET /api/v1/manutencao/ranking-entidades?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+- Ranking categorias: `GET /api/v1/manutencao/ranking-categorias?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+- Ranking técnicos: `GET /api/v1/manutencao/ranking-tecnicos?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
 
 ## Boas práticas (evitar complexidade desnecessária)
 - Preferir o container único para operação: reduz dependências e pontos de falha.

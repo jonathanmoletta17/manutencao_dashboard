@@ -1,6 +1,5 @@
 // Utilitário central para leitura/validação e persistência de parâmetros de URL
-// Foca nos parâmetros: inicio, fim, top
-import { ALLOWED_TOP } from '../constants/top';
+// Foca nos parâmetros: inicio, fim
 
 const toYmd = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -20,22 +19,13 @@ export interface DateRange {
   fim: string;
 }
 
+export type CategoryMode = 'original' | 'aggregated';
+
 export function getDefaultDateRange(now: Date = new Date()): DateRange {
   const end = new Date(now);
   const start = new Date(now);
   start.setDate(start.getDate() - 30);
   return { inicio: toYmd(start), fim: toYmd(end) };
-}
-
-export function readTopNFromUrl(href: string, fallback: number = 5): number {
-  try {
-    const url = new URL(href);
-    const qsTop = url.searchParams.get('top');
-    const n = qsTop ? Number(qsTop) : NaN;
-    return ALLOWED_TOP.includes(n as 5 | 10 | 15) ? n : fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 export function readDateRangeFromUrl(href: string, fallback?: DateRange): DateRange {
@@ -53,14 +43,36 @@ export function readDateRangeFromUrl(href: string, fallback?: DateRange): DateRa
   }
 }
 
-export function replaceUrlParams(dateRange: DateRange, topN: number): void {
+export function replaceUrlParams(dateRange: DateRange): void {
   try {
     const url = new URL(window.location.href);
     url.searchParams.set('inicio', dateRange.inicio);
     url.searchParams.set('fim', dateRange.fim);
-    url.searchParams.set('top', String(topN));
     window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
   } catch {
     // Ignorar falhas silenciosamente para não quebrar a UI
+  }
+}
+
+export function readCategoryModeFromUrl(href: string, fallback: CategoryMode = 'original'): CategoryMode {
+  try {
+    const url = new URL(href);
+    const raw = (url.searchParams.get('cat') || '').toLowerCase();
+    if (raw === 'agg' || raw === 'aggregated' || raw === '2') return 'aggregated';
+    if (raw === 'orig' || raw === 'original' || raw === '1') return 'original';
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function replaceCategoryModeInUrl(mode: CategoryMode): void {
+  try {
+    const url = new URL(window.location.href);
+    const val = mode === 'aggregated' ? 'agg' : 'orig';
+    url.searchParams.set('cat', val);
+    window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+  } catch {
+    // Ignorar falhas silenciosamente
   }
 }

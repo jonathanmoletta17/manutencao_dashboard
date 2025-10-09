@@ -19,13 +19,13 @@ import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
   import { DateRangePicker } from './components/DateRangePicker';
-  import { TopNSelect } from './components/TopNSelect';
   import TechnicianRanking from './components/TechnicianRanking';
-  import { 
-    readTopNFromUrl,
-    readDateRangeFromUrl,
-    replaceUrlParams,
-  } from './services/url_params';
+import { 
+  readDateRangeFromUrl,
+  replaceUrlParams,
+  readCategoryModeFromUrl,
+  replaceCategoryModeInUrl,
+} from './services/url_params';
   import { useDashboardData } from './hooks/useDashboardData';
   import { useCategoryGrouping } from './hooks/useCategoryGrouping';
   import { useCarousel } from './hooks/useCarousel';
@@ -35,31 +35,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 
 export default function MaintenanceDashboard() {
   const time = useClock();
-  const [topN, setTopN] = useState<number>(() => readTopNFromUrl(window.location.href));
   const [dateRange, setDateRange] = useState<{ inicio: string; fim: string }>(() => readDateRangeFromUrl(window.location.href));
+  const [categoryMode, setCategoryMode] = useState<'original'|'aggregated'>(() => readCategoryModeFromUrl(window.location.href));
 
   // Removidos refs; usamos estados atuais diretamente
 
   // Helpers utilitários
 
-  const { generalStats, entityRanking, categoryRanking, technicianRanking, newTickets, refresh, error } = useDashboardData(dateRange, topN);
+  const { generalStats, entityRanking, categoryRanking, technicianRanking, newTickets, refresh, error } = useDashboardData(dateRange);
 
   const applyDateRange = () => {
-    replaceUrlParams({ inicio: dateRange.inicio, fim: dateRange.fim }, topN);
+    replaceUrlParams({ inicio: dateRange.inicio, fim: dateRange.fim });
     refresh();
   };
 
   // Persistir Top N no URL sempre que o usuário alterar (evita duplicação)
   useEffect(() => {
-    replaceUrlParams({ inicio: dateRange.inicio, fim: dateRange.fim }, topN);
-  }, [topN, dateRange]);
+    replaceUrlParams({ inicio: dateRange.inicio, fim: dateRange.fim });
+  }, [dateRange]);
 
   // Relógio movido para useClock
 
   // Totais de status agora são atualizados junto ao polling em loadDashboardDataWith
 
   // ====== Classificação por macro área e carrossel ======
-  const { manCategories, consCategories } = useCategoryGrouping(categoryRanking);
+  const { manCategories, consCategories } = useCategoryGrouping(categoryRanking, categoryMode);
   const areas: ReadonlyArray<'Manutenção' | 'Conservação'> = ['Manutenção', 'Conservação'] as const;
   const { current: currentCategoryArea, setCurrent: setCurrentCategoryArea, goPrev: goPrevArea, goNext: goNextArea, schedulePause } = useCarousel(areas, 'Manutenção');
 
@@ -85,11 +85,7 @@ export default function MaintenanceDashboard() {
           <Button variant="ghost" size="sm" className="text-white hover:bg-blue-600" onClick={refresh}>
             <RotateCcw className="w-4 h-4" />
           </Button>
-          {/* Seletor Top N (dropdown customizado) */}
-          <div className="flex items-center gap-2 px-2 border-l border-white/20">
-            <label className="text-sm text-blue-100">Top N</label>
-            <TopNSelect value={topN} onChange={(n) => setTopN(n)} />
-          </div>
+          {/* Seletor Top N removido: exibe todos os itens */}
           <div className="flex items-center gap-3 pl-4 border-l border-white/20">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
               <User className="w-4 h-4 text-white" />
@@ -194,7 +190,7 @@ export default function MaintenanceDashboard() {
               <CardHeader className="pb-2 flex-none">
                 <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
                   <Building2 className="w-4 h-4" />
-                  {`Top ${topN} - Atribuição por Entidades`}
+                  {`Ranking por Entidades`}
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
@@ -226,9 +222,23 @@ export default function MaintenanceDashboard() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-[#5A9BD4] text-base">
                   <FolderKanban className="w-4 h-4" />
-                  {`Top ${topN} - Atribuição por Categorias (${currentCategoryArea})`}
+                  {`Ranking por Categorias (${currentCategoryArea})`}
                 </CardTitle>
                 <div className="flex items-center">
+                  <div className="flex items-center gap-2 mr-2 text-xs text-gray-600">
+                    <span>Agregado</span>
+                    <input
+                      type="checkbox"
+                      aria-label="Alternar modo agregado"
+                      checked={categoryMode === 'aggregated'}
+                      onChange={(e) => {
+                        const next = e.target.checked ? 'aggregated' : 'original';
+                        setCategoryMode(next);
+                        replaceCategoryModeInUrl(next);
+                      }}
+                      className="cursor-pointer"
+                    />
+                  </div>
                   <button
                     type="button"
                     aria-label="Anterior"
@@ -271,7 +281,7 @@ export default function MaintenanceDashboard() {
                 {(() => {
                   const items = (
                     currentCategoryArea === 'Manutenção' ? manCategories : consCategories
-                  ).slice(0, topN);
+                  );
                   return items.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <div className="flex items-center gap-3">
@@ -292,7 +302,7 @@ export default function MaintenanceDashboard() {
           </Card>
             </div>
             {/* Ranking Técnicos */}
-            <TechnicianRanking items={technicianRanking} topN={topN} />
+            <TechnicianRanking items={technicianRanking} />
             {/* Ranking Entidades */}
           </div>
 

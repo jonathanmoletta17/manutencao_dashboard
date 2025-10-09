@@ -18,10 +18,17 @@ Config:
 - `.env`/`.env.production` com `VITE_API_BASE_URL` apontando para o backend de Manutenção.
 - Opcional: `VITE_API_VERSION_PREFIX` para parametrizar o prefixo da API (padrão: `/api/v1`).
 
+Parâmetros de URL (persistência)
+- `inicio`, `fim`: intervalo de datas (YYYY-MM-DD), lidos e persistidos pelo utilitário `src/services/url_params.ts`.
+- `cat`: modo de exibição do ranking de categorias.
+  - `cat=orig` → modo original (A > B > C)
+  - `cat=agg` → modo agregado por segundo nível (A > B)
+  - O `MaintenanceDashboard` inicializa o estado a partir da URL e atualiza com `replaceCategoryModeInUrl`.
+
 Endpoints consumidos pelo dashboard:
 - `GET /api/v1/manutencao/stats-gerais?inicio=YYYY-MM-DD&fim=YYYY-MM-DD` — cinco métricas por período: Novos, Em atendimento, Pendentes, Planejados, Resolvidos.
-- `GET /api/v1/manutencao/ranking-entidades?inicio&fim&top` — ranking por entidade no período.
-- `GET /api/v1/manutencao/ranking-categorias?inicio&fim&top` — ranking por categoria no período.
+- `GET /api/v1/manutencao/ranking-entidades?inicio&fim` — ranking por entidade no período (lista completa).
+- `GET /api/v1/manutencao/ranking-categorias?inicio&fim` — ranking por categoria no período (lista completa).
 - `GET /api/v1/manutencao/tickets-novos?limit` — últimos tickets criados.
 
 Observação:
@@ -70,12 +77,17 @@ Observações operacionais:
 
 - `useClock`: o `MaintenanceDashboard` usa o hook `useClock` para atualizar o horário exibido a cada segundo, isolando o `setInterval` do componente principal.
 - Estado derivado: listas como `manCategories` e `consCategories` são derivadas exclusivamente de `categoryRanking` via `useCategoryGrouping`. Evite duplicar estado; derive sempre de uma fonte única.
-- `useDashboardData`: centraliza carregamento inicial, atualização quando `dateRange/topN` mudam e polling interno configurável via `VITE_REALTIME_POLL_INTERVAL_SEC`. O componente não cria intervalos de dados.
-- Parâmetros de URL: `replaceUrlParams` persiste `dateRange` e `topN`. A ação “Aplicar período” usa os estados atuais, evitando refs e closures obsoletas.
+- `useDashboardData`: centraliza carregamento inicial, atualização quando `dateRange` muda e polling interno configurável via `VITE_REALTIME_POLL_INTERVAL_SEC`. Inclui debounce leve ao mudar datas.
+- Parâmetros de URL: `replaceUrlParams` persiste apenas `dateRange`.
 
 ## Notas de endpoints e ranking
 
-- Top N padrão: o dashboard utiliza `top = 10` como valor padrão para rankings.
-- CategoryRanking: ao buscar categorias, solicitamos mais itens para suportar agrupamento por área sem reconsulta. A regra é `max(top * 3, 15)`.
+- Rankings sem limite: o dashboard solicita listas completas dos rankings, sem parâmetro `top`.
+- CategoryRanking: agrupamento por área usa todos os itens retornados pelo backend.
 - Tickets novos: o endpoint `tickets-novos` recebe apenas `limit` e não é afetado por `inicio/fim` do painel; a filtragem temporal, quando aplicável, é responsabilidade do backend.
 - Ranking de Técnicos: não há cache global no frontend. Se o backend responder `404` ou `501`, consideramos como ausência de dados e retornamos lista vazia. Demais erros são propagados para tratamento no hook/componente. (Semântica sujeita à confirmação com o backend.)
+
+## Limpezas realizadas
+
+- Removido `src/components/TopNSelect.tsx` por não ser utilizado no `MaintenanceDashboard` (o dashboard exibe todos os itens dos rankings).
+- Padronizada a leitura/persistência do modo de categorias via `cat=orig|agg` na URL.

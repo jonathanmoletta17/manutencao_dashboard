@@ -73,7 +73,7 @@ def generate_entity_ranking(
     session_headers: Dict[str, str],
     inicio: str,
     fim: str,
-    top_n: int = 10,
+    top_n: int | None = None,
     range_step_tickets: int = 1000,
     range_step_lookup: int = 1000,
     display_type: str = '2',
@@ -132,7 +132,9 @@ def generate_entity_ranking(
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
-    sorted_items = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    sorted_pairs = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)
+    limit = top_n if (top_n is not None and top_n > 0) else None
+    sorted_items = sorted_pairs if limit is None else sorted_pairs[:limit]
     result: List[Dict[str, Any]] = []
     for eid, count in sorted_items:
         nm = name_by_id.get(eid)
@@ -148,7 +150,7 @@ def generate_entity_ranking(
 def generate_entity_top_all(
     api_url: str,
     session_headers: Dict[str, str],
-    top_n: int = 10,
+    top_n: int | None = None,
     range_step_tickets: int = 300,
     range_step_lookup: int = 300,
     display_type: str = '2',
@@ -200,7 +202,9 @@ def generate_entity_top_all(
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
-    sorted_items = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    sorted_pairs = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)
+    limit = top_n if (top_n is not None and top_n > 0) else None
+    sorted_items = sorted_pairs if limit is None else sorted_pairs[:limit]
     result: List[Dict[str, Any]] = []
     for eid, count in sorted_items:
         nm = name_by_id.get(eid)
@@ -218,7 +222,7 @@ def generate_category_ranking(
     session_headers: Dict[str, str],
     inicio: str,
     fim: str,
-    top_n: int = 10,
+    top_n: int | None = None,
     range_step_tickets: int = 1000,
     range_step_lookup: int = 1000,
     display_type: str = '2',
@@ -275,7 +279,9 @@ def generate_category_ranking(
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
-    sorted_items = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    sorted_pairs = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)
+    limit = top_n if (top_n is not None and top_n > 0) else None
+    sorted_items = sorted_pairs if limit is None else sorted_pairs[:limit]
     result: List[Dict[str, Any]] = []
     for cid, count in sorted_items:
         nm = name_by_id.get(cid)
@@ -291,7 +297,7 @@ def generate_category_ranking(
 def generate_category_top_all(
     api_url: str,
     session_headers: Dict[str, str],
-    top_n: int = 10,
+    top_n: int | None = None,
     range_step_tickets: int = 1000,
     range_step_lookup: int = 300,
     display_type: str = '2',
@@ -344,7 +350,9 @@ def generate_category_top_all(
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
-    sorted_items = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    sorted_pairs = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)
+    limit = top_n if (top_n is not None and top_n > 0) else None
+    sorted_items = sorted_pairs if limit is None else sorted_pairs[:limit]
     result: List[Dict[str, Any]] = []
     for cid, count in sorted_items:
         nm = name_by_id.get(cid)
@@ -366,7 +374,7 @@ def generate_technician_ranking(
     session_headers: Dict[str, str],
     inicio: str,
     fim: str,
-    top_n: int = 10,
+    top_n: int | None = None,
     range_step_tickets: int = 1000,
     display_type: str = '2',
     is_recursive: str = '1',
@@ -409,7 +417,9 @@ def generate_technician_ranking(
     tech_ids = [safe_int_id(k) for k in id_counts.keys() if str(k).isdigit() and int(k) > 0]
     names_map = glpi_client.get_user_names_in_batch_with_fallback(session_headers, api_url, tech_ids)
 
-    sorted_items = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]
+    sorted_pairs = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)
+    limit = top_n if (top_n is not None and top_n > 0) else None
+    sorted_items = sorted_pairs if limit is None else sorted_pairs[:limit]
     result: List[Dict[str, Any]] = []
     for tech_id_str, count in sorted_items:
         tech_id = safe_int_id(tech_id_str)

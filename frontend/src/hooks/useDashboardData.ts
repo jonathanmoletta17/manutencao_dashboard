@@ -19,7 +19,7 @@ export interface DateRange {
   fim: string;
 }
 
-export function useDashboardData(dateRange: DateRange, topN: number) {
+export function useDashboardData(dateRange: DateRange) {
   const [generalStats, setGeneralStats] = useState<MaintenanceGeneralStats | null>(null);
   const [entityRanking, setEntityRanking] = useState<EntityRankingItem[] | null>(null);
   const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
@@ -29,7 +29,6 @@ export function useDashboardData(dateRange: DateRange, topN: number) {
 
   const refreshInFlight = useRef(false);
   const dateRangeRef = useRef(dateRange);
-  const topNRef = useRef(topN);
   // Cache leve para ranking de técnicos com TTL curto
   const techCacheRef = useRef<{ key: string; data: TechnicianRankingItem[]; ts: number } | null>(null);
 
@@ -37,35 +36,32 @@ export function useDashboardData(dateRange: DateRange, topN: number) {
     dateRangeRef.current = dateRange;
   }, [dateRange]);
 
-  useEffect(() => {
-    topNRef.current = topN;
-  }, [topN]);
+  // Top N removido: sempre buscamos lista completa, TTL curto mantém responsividade
 
   const refresh = useCallback(async () => {
     if (refreshInFlight.current) return;
     refreshInFlight.current = true;
     const { inicio, fim } = dateRangeRef.current;
-    const top = topNRef.current;
     try {
       setError(null);
       // Paraleliza chamadas independentes
       const getTechnicianRanking = async () => {
-        const key = `${inicio}|${fim}|${top}`;
+        const key = `${inicio}|${fim}|all`;
         const ttlMs = 5000; // reutiliza resultado por até 5s se parâmetros não mudarem
         const cached = techCacheRef.current;
         const now = Date.now();
         if (cached && cached.key === key && (now - cached.ts) < ttlMs) {
           return cached.data;
         }
-        const data = await fetchTechnicianRanking(inicio, fim, top);
+        const data = await fetchTechnicianRanking(inicio, fim);
         techCacheRef.current = { key, data, ts: now };
         return data;
       };
 
       const results = await Promise.allSettled([
         fetchMaintenanceGeneralStats(inicio, fim),
-        fetchEntityRanking(inicio, fim, top),
-        fetchCategoryRanking(inicio, fim, Math.max(top * 3, 15)),
+        fetchEntityRanking(inicio, fim),
+        fetchCategoryRanking(inicio, fim),
         fetchMaintenanceNewTickets(8),
         getTechnicianRanking(),
       ]);
@@ -94,10 +90,11 @@ export function useDashboardData(dateRange: DateRange, topN: number) {
     }
   }, []);
 
-  // Carregamento inicial e quando dateRange/topN mudarem
+  // Carregamento inicial e quando dateRange mudar (com debounce leve)
   useEffect(() => {
-    refresh();
-  }, [dateRange.inicio, dateRange.fim, topN, refresh]);
+    const t = setTimeout(() => { refresh(); }, 350);
+    return () => clearTimeout(t);
+  }, [dateRange.inicio, dateRange.fim, refresh]);
 
   // Polling interno configurável via .env (VITE_REALTIME_POLL_INTERVAL_SEC)
   useEffect(() => {

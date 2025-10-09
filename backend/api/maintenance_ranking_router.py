@@ -28,8 +28,9 @@ router = APIRouter(prefix="/api/v1/manutencao", tags=["Manutenção"])
 
 
 @router.get("/ranking-entidades", response_model=list[EntityRankingItem])
-def get_entity_ranking(inicio: str, fim: str, top: Optional[int] = 10):
-    cache_key = f"maintenance_entity_rank_{inicio}_{fim}_{top}"
+def get_entity_ranking(inicio: str, fim: str, top: Optional[int] = None):
+    top_key = 'all' if (top is None or top == 0) else str(top)
+    cache_key = f"maintenance_entity_rank_{inicio}_{fim}_{top_key}"
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -48,7 +49,7 @@ def get_entity_ranking(inicio: str, fim: str, top: Optional[int] = 10):
             session_headers=headers,
             inicio=inicio,
             fim=fim,
-            top_n=top
+            top_n=top if (top not in (None, 0)) else None
         )
 
         result = [EntityRankingItem(**item) for item in ranking]
@@ -86,8 +87,9 @@ def get_entity_ranking(inicio: str, fim: str, top: Optional[int] = 10):
 
 
 @router.get("/ranking-categorias", response_model=list[CategoryRankingItem])
-def get_category_ranking(inicio: str, fim: str, top: Optional[int] = 10):
-    cache_key = f"maintenance_category_rank_{inicio}_{fim}_{top}"
+def get_category_ranking(inicio: str, fim: str, top: Optional[int] = None):
+    top_key = 'all' if (top is None or top == 0) else str(top)
+    cache_key = f"maintenance_category_rank_{inicio}_{fim}_{top_key}"
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -106,7 +108,7 @@ def get_category_ranking(inicio: str, fim: str, top: Optional[int] = 10):
             session_headers=headers,
             inicio=inicio,
             fim=fim,
-            top_n=top
+            top_n=top if (top not in (None, 0)) else None
         )
 
         result = [CategoryRankingItem(**item) for item in ranking]
@@ -144,8 +146,9 @@ def get_category_ranking(inicio: str, fim: str, top: Optional[int] = 10):
 
 
 @router.get("/top-atribuicao-entidades", response_model=list[EntityRankingItem])
-def get_top_atribuicao_entidades(top: Optional[int] = 10):
-    cache_key = f"maintenance_top_entities_{top}"
+def get_top_atribuicao_entidades(top: Optional[int] = None):
+    top_key = 'all' if (top is None or top == 0) else str(top)
+    cache_key = f"maintenance_top_entities_{top_key}"
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -162,7 +165,7 @@ def get_top_atribuicao_entidades(top: Optional[int] = 10):
         ranking = generate_entity_top_all(
             api_url=API_URL,
             session_headers=headers,
-            top_n=top or 10,
+            top_n=top if (top not in (None, 0)) else None,
         )
 
         result = [EntityRankingItem(**item) for item in ranking]
@@ -200,8 +203,9 @@ def get_top_atribuicao_entidades(top: Optional[int] = 10):
 
 
 @router.get("/top-atribuicao-categorias", response_model=list[CategoryRankingItem])
-def get_top_atribuicao_categorias(top: Optional[int] = 10):
-    cache_key = f"maintenance_top_categories_{top}"
+def get_top_atribuicao_categorias(top: Optional[int] = None):
+    top_key = 'all' if (top is None or top == 0) else str(top)
+    cache_key = f"maintenance_top_categories_{top_key}"
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -218,7 +222,7 @@ def get_top_atribuicao_categorias(top: Optional[int] = 10):
         ranking = generate_category_top_all(
             api_url=API_URL,
             session_headers=headers,
-            top_n=top or 10,
+            top_n=top if (top not in (None, 0)) else None,
         )
 
         result = [CategoryRankingItem(**item) for item in ranking]
@@ -256,8 +260,9 @@ def get_top_atribuicao_categorias(top: Optional[int] = 10):
 
 
 @router.get("/ranking-tecnicos", response_model=list[TechnicianRankingItem])
-def get_technician_ranking(inicio: str, fim: str, top: Optional[int] = 10):
-    cache_key = f"maintenance_technician_rank_{inicio}_{fim}_{top}"
+def get_technician_ranking(inicio: str, fim: str, top: Optional[int] = None):
+    top_key = 'all' if (top is None or top == 0) else str(top)
+    cache_key = f"maintenance_technician_rank_{inicio}_{fim}_{top_key}"
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -276,7 +281,7 @@ def get_technician_ranking(inicio: str, fim: str, top: Optional[int] = 10):
             session_headers=headers,
             inicio=inicio,
             fim=fim,
-            top_n=top or 10,
+            top_n=top if (top not in (None, 0)) else None,
         )
 
         result = [TechnicianRankingItem(**item) for item in ranking]

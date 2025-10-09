@@ -86,12 +86,12 @@ export const fetchMaintenanceGeneralStats = (inicio?: string, fim?: string) => {
   return fetchFromAPI<MaintenanceGeneralStats>(`/manutencao/stats-gerais`, { query: { inicio, fim } });
 };
 
-export const fetchEntityRanking = (inicio?: string, fim?: string, top: number = 10) => {
-  return fetchFromAPI<EntityRankingItem[]>(`/manutencao/ranking-entidades`, { query: { inicio, fim, top } });
+export const fetchEntityRanking = (inicio?: string, fim?: string) => {
+  return fetchFromAPI<EntityRankingItem[]>(`/manutencao/ranking-entidades`, { query: { inicio, fim } });
 };
 
-export const fetchCategoryRanking = (inicio?: string, fim?: string, top: number = 10) => {
-  return fetchFromAPI<CategoryRankingItem[]>(`/manutencao/ranking-categorias`, { query: { inicio, fim, top } });
+export const fetchCategoryRanking = (inicio?: string, fim?: string) => {
+  return fetchFromAPI<CategoryRankingItem[]>(`/manutencao/ranking-categorias`, { query: { inicio, fim } });
 };
 
 export const fetchMaintenanceNewTickets = (limit: number = 10) => {
@@ -99,9 +99,9 @@ export const fetchMaintenanceNewTickets = (limit: number = 10) => {
 };
 
 // Ranking de Técnicos (por período). Se o endpoint não existir ainda, retorna [] ao invés de falhar.
-export const fetchTechnicianRanking = async (inicio?: string, fim?: string, top: number = 10) => {
+export const fetchTechnicianRanking = async (inicio?: string, fim?: string) => {
   try {
-    return await fetchFromAPI<TechnicianRankingItem[]>(`/manutencao/ranking-tecnicos`, { query: { inicio, fim, top } });
+    return await fetchFromAPI<TechnicianRankingItem[]>(`/manutencao/ranking-tecnicos`, { query: { inicio, fim } });
   } catch (err) {
     if (err instanceof APIError && (err.status === 404 || err.status === 501)) {
       // Considera ausência de dados sem quebrar o layout
