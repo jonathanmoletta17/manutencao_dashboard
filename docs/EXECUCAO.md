@@ -28,14 +28,12 @@ Este documento descreve, de forma objetiva, como configurar, instalar e executar
 5. Limpar órfãos (se necessário):
    - `docker compose -f docker-compose.single.yml up -d --remove-orphans`
 
-## Executar (Desenvolvimento – serviços separados)
-1. Backend:
-   - `docker compose -f docker-compose.dev.yml up --build -d backend`
-   - Health: `http://127.0.0.1:8010/health`
-2. Frontend:
-   - `cd frontend && npm ci && npm run dev`
-   - Acessar: `http://localhost:5002/`
-   - Proxy local de `/api/v1` aponta para `http://127.0.0.1:8010`.
+## Executar (Desenvolvimento – opcional, com hot-reload)
+1. Subir backend e frontend em containers:
+   - `docker compose -f docker-compose.dev.yml up --build -d`
+   - Backend: `http://127.0.0.1:8010/health`
+   - Frontend (Vite): `http://localhost:5002/`
+   - O Vite usa `VITE_API_BASE_URL=http://backend:8010/api/v1` (definido no compose dev).
 
 ## Endpoints principais
 - Stats gerais: `GET /api/v1/manutencao/stats-gerais?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
@@ -62,11 +60,13 @@ Este documento descreve, de forma objetiva, como configurar, instalar e executar
   - Confirme que o backend está em `http://127.0.0.1:8010` e que o proxy do Vite está ativo.
 
 ## Arquivos relevantes
+- `docker-compose.single.yml`: serviço único publicado em `8000` (fluxo oficial).
 - `Dockerfile.single`: build do frontend e runtime backend+Nginx.
 - `frontend/nginx.single.conf`: Nginx servindo `/dashboard/` e proxy de `/api`.
 - `start.sh`: inicializa Uvicorn e Nginx no container.
+- `docker-compose.dev.yml`: modo desenvolvimento com backend+frontend (opcional).
+- `Dockerfile.backend` e `backend/requirements.txt`: dependências do backend.
 - `frontend/vite.config.ts`: base `/dashboard/` no build e proxy dev de `/api/v1`.
-- `docker-compose.single.yml`: serviço único publicado em `8000`.
 
 ---
 Mantemos foco em simplicidade e clareza: um único container que entrega UI e API, com rotas estáveis e sem sobre-engenharia.

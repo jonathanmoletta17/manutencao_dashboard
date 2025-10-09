@@ -6,9 +6,11 @@ from typing import Dict, List, Any
 from .. import glpi_client
 from .glpi_constants import (
     FIELD_STATUS, FIELD_CREATED, FIELD_ID, FIELD_NAME,
-    FIELD_ENTITY,
+    FIELD_ENTITY, FIELD_REQUESTER,
     STATUS_NEW,
 )
+from .criteria_helpers import add_status
+from ..utils.convert import to_int_zero, first_numeric_id
 
 
 def get_maintenance_new_tickets(
@@ -22,11 +24,10 @@ def get_maintenance_new_tickets(
     Returns:
         Lista de tickets novos com id, titulo, solicitante, data, entidade
     """
-    criteria = [
-        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': STATUS_NEW}
-    ]
+    criteria = add_status([], STATUS_NEW)
 
-    forced = [str(FIELD_NAME), str(FIELD_ID), '4', str(FIELD_CREATED), str(FIELD_ENTITY)]
+    # Campos forçados: título, id, solicitante, data, entidade
+    forced = [str(FIELD_NAME), str(FIELD_ID), str(FIELD_REQUESTER), str(FIELD_CREATED), str(FIELD_ENTITY)]
     tickets_data = glpi_client.search_paginated(
         headers=session_headers,
         api_url=api_url,
@@ -41,29 +42,16 @@ def get_maintenance_new_tickets(
     if not tickets_data:
         return []
 
-    def safe_int(v: Any) -> int:
-        try:
-            return int(str(v))
-        except Exception:
-            return 0
-
-    sorted_tickets = sorted(tickets_data, key=lambda x: safe_int(x.get(str(FIELD_ID))), reverse=True)[:limit]
-
-    def get_first_numeric_id(value: Any):
-        if value is None:
-            return None
-        if isinstance(value, list):
-            for v in value:
-                v_str = str(v)
-                if v_str.isdigit():
-                    return int(v_str)
-            return None
-        v_str = str(value)
-        return int(v_str) if v_str.isdigit() else None
+    # Ordenação por ID desc e aplicação do limite
+    sorted_tickets = sorted(
+        tickets_data,
+        key=lambda x: to_int_zero(x.get(str(FIELD_ID))),
+        reverse=True
+    )[:limit]
 
     requester_ids = []
     for t in sorted_tickets:
-        rid = get_first_numeric_id(t.get('4'))
+        rid = first_numeric_id(t.get('4'))
         if isinstance(rid, int):
             requester_ids.append(rid)
 
@@ -71,7 +59,7 @@ def get_maintenance_new_tickets(
 
     result: List[Dict[str, Any]] = []
     for t in sorted_tickets:
-        ticket_id = safe_int(t.get(str(FIELD_ID)))
+        ticket_id = to_int_zero(t.get(str(FIELD_ID)))
         titulo = t.get(str(FIELD_NAME)) or 'Sem título'
         created_raw = t.get(str(FIELD_CREATED))
 
@@ -89,7 +77,7 @@ def get_maintenance_new_tickets(
         if isinstance(raw_req, str) and not raw_req.isdigit():
             solicitante = raw_req
         else:
-            rid = get_first_numeric_id(raw_req)
+            rid = first_numeric_id(raw_req)
             if isinstance(rid, int) and rid in names_map:
                 solicitante = names_map[rid]
 

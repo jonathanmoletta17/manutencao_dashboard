@@ -293,21 +293,24 @@ def get_technician_ranking(inicio: str, fim: str, top: Optional[int] = 10):
         if stale is not None:
             logger.warning("Retornando valor stale para ranking-tecnicos devido a falha de autenticação")
             return stale
-        raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
+        logger.warning("Retornando [] para ranking-tecnicos devido a falha de autenticação no GLPI")
+        return []
     except GLPINetworkError as e:
         logger.error("Erro de rede GLPI: %s", str(e))
         stale = cache.get_stale(cache_key)
         if stale is not None:
             logger.warning("Retornando valor stale para ranking-tecnicos devido a erro de rede")
             return stale
-        raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
+        logger.warning("Retornando [] para ranking-tecnicos devido a erro de rede com GLPI")
+        return []
     except GLPISearchError as e:
         logger.error("Erro de busca GLPI: %s", str(e))
         stale = cache.get_stale(cache_key)
         if stale is not None:
             logger.warning("Retornando valor stale para ranking-tecnicos devido a erro de busca")
             return stale
-        raise HTTPException(status_code=502, detail="Erro ao buscar dados no GLPI.")
+        logger.warning("Retornando [] para ranking-tecnicos devido a erro ao buscar dados no GLPI")
+        return []
     except Exception as e:
         logger.exception("Erro inesperado ao buscar ranking de técnicos: %s", str(e))
         raise HTTPException(status_code=500, detail="Erro interno ao processar ranking.")

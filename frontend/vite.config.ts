@@ -12,7 +12,7 @@ export default defineConfig(({ command }) => ({
       "/api/v1": {
         target: "http://127.0.0.1:8010",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v1/, ""),
+        // Não reescreve o prefixo; o backend espera /api/v1
       },
     },
   },

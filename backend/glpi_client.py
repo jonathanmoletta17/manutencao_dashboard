@@ -3,25 +3,42 @@ Cliente GLPI
 Funções para autenticação, configuração de entidade e busca paginada,
 com cache simples de sessão para evitar reautenticação por requisição.
 Lança exceções específicas para que a camada de API mapeie respostas HTTP neutras.
+
+Sessão e Cache
+---------------
+- Usa cache por processo com TTL para reuso de `Session-Token`.
+- Protegido por lock para evitar condições de corrida em ambientes multi-thread.
+- TTL padrão vem de `SESSION_TTL_SEC` (env), mas pode ser injetado via argumento.
+- Mudança de entidade ativa pode ser desabilitada via env `GLPI_CHANGE_ENTITY`.
 """
 import os
 import time
+import threading
 from typing import Any, Dict, List, Optional
 
 import requests
 import logging
 
 from .logic.errors import GLPIAuthError, GLPINetworkError, GLPISearchError
+from .utils.glpi_params import build_search_params, mask_sensitive_keys
+from .utils.convert import to_int_zero
 
 logger = logging.getLogger(__name__)
 
 # Cache leve de sessão (reuso de Session-Token por TTL curto)
 _SESSION_HEADERS: Optional[Dict[str, str]] = None
 _SESSION_TS: float = 0.0
+_SESSION_LOCK = threading.Lock()
 SESSION_TTL_SEC = int(os.environ.get("SESSION_TTL_SEC", "300"))
 
 
-def authenticate(api_url: str, app_token: str, user_token: str) -> Dict[str, str]:
+def authenticate(
+    api_url: str,
+    app_token: str,
+    user_token: str,
+    session_ttl_sec: Optional[int] = None,
+    change_entity: Optional[bool] = None,
+) -> Dict[str, str]:
     """
     Autentica no GLPI e configura entidade ativa.
     
@@ -33,10 +50,12 @@ def authenticate(api_url: str, app_token: str, user_token: str) -> Dict[str, str
     Returns:
         Headers com session-token para uso nas próximas requisições
     """
-    # Cache de sessão: reutiliza se ainda válido
+    # Cache de sessão: reutiliza se ainda válido (com proteção de lock)
     global _SESSION_HEADERS, _SESSION_TS
-    if _SESSION_HEADERS and (time.time() - _SESSION_TS) < SESSION_TTL_SEC:
-        return _SESSION_HEADERS
+    ttl = SESSION_TTL_SEC if session_ttl_sec is None else int(session_ttl_sec)
+    with _SESSION_LOCK:
+        if _SESSION_HEADERS and (time.time() - _SESSION_TS) < ttl:
+            return _SESSION_HEADERS
 
     # Endpoint de autenticação
     auth_url = f"{api_url}/initSession"
@@ -65,29 +84,38 @@ def authenticate(api_url: str, app_token: str, user_token: str) -> Dict[str, str
             'App-Token': app_token
         }
         
-        # Configurar entidade ativa (conforme script exemplo: EntitiesId = 1, recursivo)
-        change_entity_url = f"{api_url}/changeActiveEntities"
-        entity_data = {
-            'entities_id': 1,
-            'is_recursive': True
-        }
-        
-        entity_response = requests.post(change_entity_url, headers=session_headers, json=entity_data, timeout=(3, 6))
-        entity_response.raise_for_status()
-        # Atualiza cache de sessão
-        _SESSION_HEADERS = session_headers
-        _SESSION_TS = time.time()
+        # Determinar se deve trocar entidade ativa
+        # change_entity=None => usa env GLPI_CHANGE_ENTITY (default habilitado)
+        change_by_env = os.environ.get("GLPI_CHANGE_ENTITY", "1").strip().lower()
+        change_enabled = (change_entity if change_entity is not None else (change_by_env not in ("0", "false")))
+
+        if change_enabled:
+            change_entity_url = f"{api_url}/changeActiveEntities"
+            entity_data = {
+                'entities_id': 1,
+                'is_recursive': True
+            }
+            entity_response = requests.post(change_entity_url, headers=session_headers, json=entity_data, timeout=(3, 6))
+            entity_response.raise_for_status()
+
+        # Atualiza cache de sessão com lock
+        with _SESSION_LOCK:
+            _SESSION_HEADERS = session_headers
+            _SESSION_TS = time.time()
 
         return session_headers
         
     except requests.exceptions.Timeout:
+        # Timeout pode ocorrer tanto em initSession quanto em changeActiveEntities
         raise GLPINetworkError("Timeout na autenticação/configuração de entidade", timeout=True)
     except requests.exceptions.HTTPError as e:
         status = getattr(e.response, 'status_code', None)
         if status in (401, 403):
             raise GLPIAuthError("Falha de autenticação GLPI", status_code=status)
+        # Demais erros HTTP na autenticação ou troca de entidade
         raise GLPISearchError(f"Erro HTTP na autenticação/configuração (status={status})", status_code=status)
     except requests.exceptions.RequestException:
+        # Falhas de rede genéricas
         raise GLPINetworkError("Falha de rede na autenticação/configuração de entidade")
 
 def search_paginated(
@@ -116,32 +144,30 @@ def search_paginated(
         Lista completa de registros encontrados
     """
     search_url = f"{api_url}/search/{itemtype}"
-    all_results = []
+    all_results: List[Dict[str, Any]] = []
     start = 0
-    
-    # Parâmetros base
-    params = {}
-    if uid_cols:
-        params['uid_cols'] = '1'
-    if forcedisplay:
-        for i, f in enumerate(forcedisplay):
-            params[f'forcedisplay[{i}]'] = f
-    if criteria:
-        for i, c in enumerate(criteria):
-            for k, v in c.items():
-                params[f'criteria[{i}][{k}]'] = v
-    if extra_params:
-        for k, v in extra_params.items():
-            params[str(k)] = v
+
+    # Parâmetros base via helper reutilizável
+    params = build_search_params(
+        uid_cols=uid_cols,
+        forcedisplay=forcedisplay,
+        criteria=criteria,
+        extra_params=extra_params,
+    )
     
     try:
         while True:
             # Configurar range para paginação
             current_params = params.copy()
             current_params['range'] = f"{start}-{start + range_step - 1}"
-            
-            # Log detalhado da requisição ao GLPI
-            logger.debug("GLPI search GET %s itemtype=%s params=%s", search_url, itemtype, current_params)
+
+            # Log detalhado sem expor valores sensíveis
+            logger.debug(
+                "GLPI search GET %s itemtype=%s params=%s",
+                search_url,
+                itemtype,
+                mask_sensitive_keys(current_params),
+            )
 
             response = requests.get(search_url, headers=headers, params=current_params, timeout=(3, 6))
             response.raise_for_status()
@@ -149,16 +175,17 @@ def search_paginated(
             data = response.json()
             
             # Verificar se há dados
-            if not data or 'data' not in data or not data['data']:
+            rows = data.get('data') if isinstance(data, dict) else None
+            if not rows:
                 break
-                
-            all_results.extend(data['data'])
-            
+
+            all_results.extend(rows)
+
             # Verificar se chegou ao fim
-            totalcount = data.get('totalcount', 0)
-            if len(all_results) >= totalcount or len(data['data']) < range_step:
+            totalcount = int(data.get('totalcount', 0) or 0)
+            if (totalcount > 0 and len(all_results) >= totalcount) or (len(rows) < range_step):
                 break
-                
+
             start += range_step
             
         return all_results
@@ -198,7 +225,10 @@ def get_user_names_in_batch_with_fallback(headers: Dict[str, str], api_url: str,
     import requests as _requests
 
     names_map: Dict[int, str] = {}
-    unique_ids = list(sorted(set(int(rid) for rid in requester_ids if isinstance(rid, (int, str)))))
+    # Normalização robusta de IDs: converte qualquer valor para int, devolve 0 em falha
+    # Filtra IDs <= 0 e remove duplicados com ordenação
+    normalized_ids = [to_int_zero(rid) for rid in requester_ids]
+    unique_ids = list(sorted({rid for rid in normalized_ids if rid > 0}))
 
     for user_id in unique_ids:
         try:
@@ -216,8 +246,18 @@ def get_user_names_in_batch_with_fallback(headers: Dict[str, str], api_url: str,
             full_name = f"{first_name} {last_name}".strip()
             names_map[user_id] = full_name if full_name else f"Usuário ID {user_id}"
 
+        except _requests.exceptions.Timeout:
+            names_map[user_id] = f"Usuário ID {user_id} (Timeout)"
+        except _requests.exceptions.HTTPError as e:
+            status = getattr(e.response, 'status_code', None)
+            if status == 403:
+                names_map[user_id] = f"Usuário ID {user_id} (Sem Permissão)"
+            elif status == 404:
+                names_map[user_id] = f"Usuário ID {user_id} (Não Encontrado)"
+            else:
+                names_map[user_id] = f"Usuário ID {user_id} (Erro HTTP {status})"
         except _requests.exceptions.RequestException:
-            names_map[user_id] = f"Usuário ID {user_id} (Não Encontrado)"
+            names_map[user_id] = f"Usuário ID {user_id} (Erro de Rede)"
         except (IndexError, KeyError, TypeError, ValueError):
             names_map[user_id] = f"Usuário ID {user_id} (Dados Incompletos)"
 

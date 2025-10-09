@@ -45,3 +45,65 @@ Configuração
   - `GLPI_APP_TOKEN` (ou `APP_TOKEN`)
   - `GLPI_USER_TOKEN` (ou `USER_TOKEN`)
   - `CACHE_TTL_SEC` (opcional, padrão definido no código)
+
+Critérios de busca
+
+- Helpers centralizados em `logic/criteria_helpers.py` montam critérios de forma pura e consistente.
+- `add_date_range(inicio, fim)`: normaliza datas (`00:00:00`/`23:59:59`) e aplica `AND` corretamente.
+- `add_status(status)`: adiciona filtro de status, incluindo `link='AND'` quando já há critérios prévios.
+- A ordem dos critérios no array é usada para indexação (`criteria[{i}]`) pelo cliente GLPI.
+
+Status e Constantes
+
+- Os status e campos utilizados no dashboard estão centralizados em `backend/logic/glpi_constants.py`.
+- Mapeamentos principais de status (GLPI Ticket.status):
+  - `STATUS_NEW = 1` → Novo
+  - `STATUS_ASSIGNED = 2` → Em atendimento
+  - `STATUS_PLANNED = 3` → Planejado
+  - `STATUS_PENDING = 4` → Pendente
+  - `STATUS_SOLVED = 5` → Solucionado
+  - `STATUS_CLOSED = 6` → Fechado
+- Campos de busca relevantes:
+  - `FIELD_STATUS = 12` (status)
+  - `FIELD_CREATED = 15` (data de criação)
+  - `FIELD_REQUESTER = 4` (solicitante)
+  - `FIELD_ENTITY = 80` (entidade)
+  - `FIELD_CATEGORY = 7` (categoria)
+
+Semântica dos agregados
+
+- `stats-gerais` (por período):
+  - `novos`: tickets com `STATUS_NEW` dentro do intervalo.
+  - `em_atendimento`: tickets com `STATUS_ASSIGNED` dentro do intervalo.
+  - `pendentes`: tickets com `STATUS_PENDING` dentro do intervalo.
+
+Testes
+
+- Os testes unitários do cliente GLPI estão em `backend/tests/test_glpi_client.py`.
+- Como executar:
+  - `python -m unittest discover backend/tests -v`
+- Cobertura principal:
+  - `authenticate`: sucesso, timeout, HTTP 401/403, HTTP 500.
+  - `search_paginated`: sucesso (1–2 páginas), timeout, HTTP 403, HTTP 500.
+  - `get_user_names_in_batch_with_fallback`: sucesso, nomes vazios, timeout, HTTP 403/404/outros, erros de rede, dados incompletos.
+
+Configuração de cache e entidade
+
+- `SESSION_TTL_SEC`: TTL do cache de sessão (padrão `300`). Pode ser injetado via argumento em `authenticate(...)`.
+- `GLPI_CHANGE_ENTITY`: controla troca de entidade ativa (default habilitado: `1`). Pode ser desabilitado com `0`/`false` ou via parâmetro `change_entity=False` em `authenticate(...)`.
+  - `planejados`: tickets com `STATUS_PLANNED` dentro do intervalo.
+  - `resolvidos`: soma de `STATUS_SOLVED` + `STATUS_CLOSED` dentro do intervalo.
+- `status-totais` (sem período):
+  - `novos`: total com `STATUS_NEW`.
+  - `em_atendimento`: total com `STATUS_ASSIGNED`.
+  - `nao_solucionados`: soma de `STATUS_ASSIGNED` + `STATUS_PENDING` (em atendimento ou pendente).
+  - `planejados`: total com `STATUS_PLANNED`.
+  - `solucionados`: total com `STATUS_SOLVED`.
+  - `fechados`: total com `STATUS_CLOSED`.
+  - `resolvidos`: soma de `STATUS_SOLVED` + `STATUS_CLOSED`.
+
+Observações de contrato
+
+- `resolvidos` agrega estados finais (`solucionado` e `fechado`), mantendo coerência visual.
+- `nao_solucionados` representa o trabalho em curso ou bloqueado (atribuição + pendência), sem incluir `novo`.
+- Comentários e implementações foram alinhados para refletir corretamente `planejados = status 3`.

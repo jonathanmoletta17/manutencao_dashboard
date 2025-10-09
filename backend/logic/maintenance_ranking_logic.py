@@ -7,6 +7,65 @@ from .. import glpi_client
 from .glpi_constants import (
     FIELD_CREATED, FIELD_ENTITY, FIELD_CATEGORY, FIELD_TECH,
 )
+from .criteria_helpers import add_date_range
+
+# Helpers globais de sanitização e validação de rótulos
+def sanitize_label(s: Any) -> str:
+    if not isinstance(s, str):
+        s = str(s) if s is not None else ''
+    t = s
+    replacements = {
+        '&amp;#62;': '>',
+        '&#62;': '>',
+        '&gt;': '>',
+        '&amp;gt;': '>',
+        '&#39;': "'",
+        '&amp;': '&',
+        '&lt;': '<',
+        '&amp;lt;': '<',
+        '&#60;': '<',
+        '&quot;': '"',
+        '&#34;': '"',
+        '&nbsp;': ' ',
+    }
+    for k, v in replacements.items():
+        t = t.replace(k, v)
+    return t
+
+def _normalize_label(s: str) -> str:
+    return (s or '').strip().lower()
+
+def is_invalid_label(s: str) -> bool:
+    ns = _normalize_label(s)
+    return ns in ('none', 'null', '')
+
+# Helpers globais para normalização/conversão de técnicos
+def normalize_tech_key(raw: Any) -> str:
+    """Normaliza users_id_assign para um bucket único '0' quando não há ID numérico válido."""
+    if isinstance(raw, list):
+        for v in raw:
+            vs = str(v).strip()
+            if vs.isdigit() and int(vs) > 0:
+                return vs
+        return '0'
+    if isinstance(raw, (int, float)):
+        try:
+            iv = int(raw)
+            return str(iv) if iv > 0 else '0'
+        except Exception:
+            return '0'
+    if isinstance(raw, str):
+        s = raw.strip()
+        if s.isdigit() and int(s) > 0:
+            return s
+        return '0'
+    return '0'
+
+def safe_int_id(s: Any) -> int:
+    try:
+        return int(s)
+    except Exception:
+        return 0
 
 
 def generate_entity_ranking(
@@ -14,7 +73,11 @@ def generate_entity_ranking(
     session_headers: Dict[str, str],
     inicio: str,
     fim: str,
-    top_n: int = 10
+    top_n: int = 10,
+    range_step_tickets: int = 1000,
+    range_step_lookup: int = 1000,
+    display_type: str = '2',
+    is_recursive: str = '1',
 ) -> List[Dict[str, Any]]:
     """
     Gera ranking de tickets por entidade dentro de um período.
@@ -24,11 +87,8 @@ def generate_entity_ranking(
     Returns:
         Lista de {entity_name, ticket_count} ordenada por count
     """
-    # Critérios com link correto entre condições (sem entrada solta de 'AND')
-    criteria = [
-        {'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
+    # Critérios com link correto entre condições
+    criteria = add_date_range([], inicio, fim, field=FIELD_CREATED)
 
     tickets_data = glpi_client.search_paginated(
         headers=session_headers,
@@ -37,8 +97,8 @@ def generate_entity_ranking(
         criteria=criteria,
         forcedisplay=[str(FIELD_ENTITY)],
         uid_cols=False,
-        range_step=300,
-        extra_params={'display_type': '2', 'is_recursive': '1'}
+        range_step=range_step_tickets,
+        extra_params={'display_type': display_type, 'is_recursive': is_recursive}
     )
 
     id_counts: Dict[str, int] = {}
@@ -58,24 +118,8 @@ def generate_entity_ranking(
         criteria=[],
         forcedisplay=['Entity.id', 'Entity.completename', 'Entity.name'],
         uid_cols=True,
-        range_step=300
+        range_step=range_step_lookup
     )
-
-    def sanitize_label(s: Any) -> str:
-        if not isinstance(s, str):
-            s = str(s) if s is not None else ''
-        t = s
-        replacements = {
-            '&amp;#62;': '>',
-            '&#62;': '>',
-            '&gt;': '>',
-            '&amp;gt;': '>',
-            '&#39;': "'",
-            '&amp;': '&',
-        }
-        for k, v in replacements.items():
-            t = t.replace(k, v)
-        return t
 
     name_by_id: Dict[str, str] = {}
     for er in entity_rows:
@@ -83,6 +127,8 @@ def generate_entity_ranking(
         comp = er.get('Entity.completename')
         nm = er.get('Entity.name')
         label = sanitize_label(comp or nm or oid)
+        if is_invalid_label(label):
+            continue
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
@@ -92,6 +138,8 @@ def generate_entity_ranking(
         nm = name_by_id.get(eid)
         if not nm:
             nm = '(sem entidade)' if eid == '0' else eid
+        if is_invalid_label(nm):
+            continue
         result.append({'entity_name': nm, 'ticket_count': count})
 
     return result
@@ -100,7 +148,11 @@ def generate_entity_ranking(
 def generate_entity_top_all(
     api_url: str,
     session_headers: Dict[str, str],
-    top_n: int = 10
+    top_n: int = 10,
+    range_step_tickets: int = 300,
+    range_step_lookup: int = 300,
+    display_type: str = '2',
+    is_recursive: str = '1',
 ) -> List[Dict[str, Any]]:
     """
     Top N de atribuição por entidades (sem filtro de datas),
@@ -113,8 +165,8 @@ def generate_entity_top_all(
         criteria=[],
         forcedisplay=[str(FIELD_ENTITY)],
         uid_cols=False,
-        range_step=300,
-        extra_params={'display_type': '2', 'is_recursive': '1'}
+        range_step=range_step_tickets,
+        extra_params={'display_type': display_type, 'is_recursive': is_recursive}
     )
 
     id_counts: Dict[str, int] = {}
@@ -134,24 +186,8 @@ def generate_entity_top_all(
         criteria=[],
         forcedisplay=['Entity.id', 'Entity.completename', 'Entity.name'],
         uid_cols=True,
-        range_step=300
+        range_step=range_step_lookup
     )
-
-    def sanitize_label(s: Any) -> str:
-        if not isinstance(s, str):
-            s = str(s) if s is not None else ''
-        t = s
-        replacements = {
-            '&amp;#62;': '>',
-            '&#62;': '>',
-            '&gt;': '>',
-            '&amp;gt;': '>',
-            '&#39;': "'",
-            '&amp;': '&',
-        }
-        for k, v in replacements.items():
-            t = t.replace(k, v)
-        return t
 
     name_by_id: Dict[str, str] = {}
     for er in entity_rows:
@@ -159,6 +195,8 @@ def generate_entity_top_all(
         comp = er.get('Entity.completename')
         nm = er.get('Entity.name')
         label = sanitize_label(comp or nm or oid)
+        if is_invalid_label(label):
+            continue
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
@@ -168,6 +206,8 @@ def generate_entity_top_all(
         nm = name_by_id.get(eid)
         if not nm:
             nm = '(sem entidade)' if eid == '0' else eid
+        if is_invalid_label(nm):
+            continue
         result.append({'entity_name': nm, 'ticket_count': count})
 
     return result
@@ -178,17 +218,18 @@ def generate_category_ranking(
     session_headers: Dict[str, str],
     inicio: str,
     fim: str,
-    top_n: int = 10
+    top_n: int = 10,
+    range_step_tickets: int = 1000,
+    range_step_lookup: int = 1000,
+    display_type: str = '2',
+    is_recursive: str = '1',
 ) -> List[Dict[str, Any]]:
     """
     Gera ranking de tickets por categoria.
     Returns:
         Lista de {category_name, ticket_count} ordenada por count
     """
-    criteria = [
-        {'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
+    criteria = add_date_range([], inicio, fim, field=FIELD_CREATED)
 
     # Buscar IDs brutos de categoria no Ticket para contagem confiável
     tickets_data = glpi_client.search_paginated(
@@ -198,8 +239,8 @@ def generate_category_ranking(
         criteria=criteria,
         forcedisplay=[str(FIELD_CATEGORY)],
         uid_cols=False,
-        range_step=300,
-        extra_params={'display_type': '2', 'is_recursive': '1'}
+        range_step=range_step_tickets,
+        extra_params={'display_type': display_type, 'is_recursive': is_recursive}
     )
 
     id_counts: Dict[str, int] = {}
@@ -220,24 +261,8 @@ def generate_category_ranking(
         criteria=[],
         forcedisplay=['ITILCategory.id', 'ITILCategory.completename', 'ITILCategory.name'],
         uid_cols=True,
-        range_step=300
+        range_step=range_step_lookup
     )
-
-    def sanitize_label(s: Any) -> str:
-        if not isinstance(s, str):
-            s = str(s) if s is not None else ''
-        t = s
-        replacements = {
-            '&amp;#62;': '>',
-            '&#62;': '>',
-            '&gt;': '>',
-            '&amp;gt;': '>',
-            '&#39;': "'",
-            '&amp;': '&',
-        }
-        for k, v in replacements.items():
-            t = t.replace(k, v)
-        return t
 
     name_by_id: Dict[str, str] = {}
     for cr in category_rows:
@@ -245,6 +270,8 @@ def generate_category_ranking(
         comp = cr.get('ITILCategory.completename')
         nm = cr.get('ITILCategory.name')
         label = sanitize_label(comp or nm or oid)
+        if is_invalid_label(label):
+            continue
         if oid and (oid not in name_by_id):
             name_by_id[oid] = label
 
@@ -254,6 +281,8 @@ def generate_category_ranking(
         nm = name_by_id.get(cid)
         if not nm:
             nm = 'sem' if cid == '0' else cid
+        if is_invalid_label(nm):
+            continue
         result.append({'category_name': nm, 'ticket_count': count})
 
     return result
@@ -262,7 +291,11 @@ def generate_category_ranking(
 def generate_category_top_all(
     api_url: str,
     session_headers: Dict[str, str],
-    top_n: int = 10
+    top_n: int = 10,
+    range_step_tickets: int = 1000,
+    range_step_lookup: int = 300,
+    display_type: str = '2',
+    is_recursive: str = '1',
 ) -> List[Dict[str, Any]]:
     """
     Top N de atribuição por categorias (sem filtro de datas),
@@ -275,8 +308,8 @@ def generate_category_top_all(
         criteria=[],
         forcedisplay=[str(FIELD_CATEGORY)],
         uid_cols=False,
-        range_step=300,
-        extra_params={'display_type': '2', 'is_recursive': '1'}
+        range_step=range_step_tickets,
+        extra_params={'display_type': display_type, 'is_recursive': is_recursive}
     )
 
     id_counts: Dict[str, int] = {}
@@ -296,31 +329,8 @@ def generate_category_top_all(
         criteria=[],
         forcedisplay=['ITILCategory.id', 'ITILCategory.completename', 'ITILCategory.name'],
         uid_cols=True,
-        range_step=300
+        range_step=range_step_lookup
     )
-
-    def sanitize_label(s: Any) -> str:
-        if not isinstance(s, str):
-            s = str(s) if s is not None else ''
-        t = s
-        replacements = {
-            '&amp;#62;': '>',
-            '&#62;': '>',
-            '&gt;': '>',
-            '&amp;gt;': '>',
-            '&#39;': "'",
-            '&amp;': '&',
-        }
-        for k, v in replacements.items():
-            t = t.replace(k, v)
-        return t
-
-    def normalize_label(s: str) -> str:
-        return (s or '').strip().lower()
-
-    def is_invalid_label(s: str) -> bool:
-        ns = normalize_label(s)
-        return ns in ('none', 'null', '')
 
     name_by_id: Dict[str, str] = {}
     for cr in category_rows:
@@ -356,7 +366,10 @@ def generate_technician_ranking(
     session_headers: Dict[str, str],
     inicio: str,
     fim: str,
-    top_n: int = 20
+    top_n: int = 10,
+    range_step_tickets: int = 1000,
+    display_type: str = '2',
+    is_recursive: str = '1',
 ) -> List[Dict[str, Any]]:
     """
     Gera ranking de tickets por técnico (users_id_assign = FIELD_TECH = 5) dentro de um período.
@@ -365,10 +378,8 @@ def generate_technician_ranking(
     Returns:
         Lista de {tecnico, tickets} ordenada por count
     """
-    criteria = [
-        {'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
+    # Critério de intervalo de datas consistente com os demais rankings
+    criteria = add_date_range([], inicio, fim, field=FIELD_CREATED)
 
     # Buscar IDs de técnicos atribuídos diretamente do Ticket (display_type=2 retorna ID bruto)
     tickets_data = glpi_client.search_paginated(
@@ -378,30 +389,9 @@ def generate_technician_ranking(
         criteria=criteria,
         forcedisplay=[str(FIELD_TECH)],
         uid_cols=False,
-        range_step=300,
-        extra_params={'display_type': '2', 'is_recursive': '1'}
+        range_step=range_step_tickets,
+        extra_params={'display_type': display_type, 'is_recursive': is_recursive}
     )
-
-    def normalize_tech_key(raw: Any) -> str:
-        """Normaliza users_id_assign para um único bucket 'Sem técnico' quando não há ID numérico válido."""
-        if isinstance(raw, list):
-            for v in raw:
-                vs = str(v).strip()
-                if vs.isdigit() and int(vs) > 0:
-                    return vs
-            return '0'
-        if isinstance(raw, (int, float)):
-            try:
-                iv = int(raw)
-                return str(iv) if iv > 0 else '0'
-            except Exception:
-                return '0'
-        if isinstance(raw, str):
-            s = raw.strip()
-            if s.isdigit() and int(s) > 0:
-                return s
-            return '0'
-        return '0'
 
     id_counts: Dict[str, int] = {}
     for row in tickets_data:
@@ -416,13 +406,7 @@ def generate_technician_ranking(
         return []
 
     # Resolver nomes dos técnicos via /User/{id}, aproveitando utilitário existente
-    def safe_int_id(s: str) -> int:
-        try:
-            return int(s)
-        except Exception:
-            return 0
-
-    tech_ids = [safe_int_id(k) for k in id_counts.keys() if k.isdigit() and int(k) > 0]
+    tech_ids = [safe_int_id(k) for k in id_counts.keys() if str(k).isdigit() and int(k) > 0]
     names_map = glpi_client.get_user_names_in_batch_with_fallback(session_headers, api_url, tech_ids)
 
     sorted_items = sorted(id_counts.items(), key=lambda x: x[1], reverse=True)[:top_n]

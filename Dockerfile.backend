@@ -5,11 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Copia apenas o backend para a imagem
+# Copia dependências e backend para a imagem
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend/ /app/backend/
-
-# Instala dependências mínimas necessárias
-RUN pip install --no-cache-dir fastapi uvicorn requests
 
 EXPOSE 8010
 

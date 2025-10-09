@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.single
+    container_name: manutencao_dashboard
     ports:
       - "8000:8000"
     env_file:

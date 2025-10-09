@@ -1,6 +1,7 @@
 import { Award } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { fmt } from "../utils/format";
 import type { TechnicianRankingItem } from "../types/maintenance-api.d";
 
 interface TechnicianRankingProps {
@@ -18,10 +19,7 @@ const shortName = (name: string) => {
   return `${first} ${lastInitial}.`;
 };
 
-const fmt = (n: number | undefined | null) =>
-  n !== undefined && n !== null
-    ? new Intl.NumberFormat('pt-BR').format(n)
-    : '-';
+// usa utilitário compartilhado fmt
 
 export function TechnicianRanking({ items, title = 'Ranking de Técnicos', topN }: TechnicianRankingProps) {
   const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();

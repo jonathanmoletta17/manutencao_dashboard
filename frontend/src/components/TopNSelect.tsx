@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
+import { ALLOWED_TOP } from "../constants/top";
 
 type Props = {
   value: number;
@@ -10,7 +11,7 @@ type Props = {
 // Componente separado para evitar remount em cada re-render do Dashboard
 export function TopNSelect({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
-  const options = [5, 10, 20, 50];
+  const options = ALLOWED_TOP as readonly number[];
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

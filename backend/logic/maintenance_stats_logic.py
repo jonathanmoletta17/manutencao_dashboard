@@ -6,8 +6,9 @@ from typing import Dict
 from .. import glpi_client
 from .glpi_constants import (
     FIELD_STATUS, FIELD_CREATED, FIELD_ID,
-    STATUS_NEW, STATUS_SOLVED
+    STATUS_NEW, STATUS_ASSIGNED, STATUS_PLANNED, STATUS_PENDING, STATUS_SOLVED, STATUS_CLOSED,
 )
+from .criteria_helpers import add_date_range, add_status
 
 
 def generate_maintenance_stats(
@@ -22,104 +23,45 @@ def generate_maintenance_stats(
     Returns:
         Dict com novos, pendentes, planejados, resolvidos
     """
-    # Novos (status 1)
-    criteria_novos = [
-        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': STATUS_NEW},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
-    novos_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=criteria_novos,
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
+    # Helpers internos para reduzir repetição e manter código limpo
+    def _count_by_status_in_range(status: int | str) -> int:
+        criteria = add_date_range(
+            add_status([], status),
+            inicio,
+            fim,
+            field=FIELD_CREATED,
+        )
+        data = glpi_client.search_paginated(
+            headers=session_headers,
+            api_url=api_url,
+            itemtype='Ticket',
+            criteria=criteria,
+            forcedisplay=[FIELD_ID],
+            uid_cols=False,
+        )
+        return len(data)
 
 
     # Em atendimento (status 2 - Atribuído/Em progresso)
-    criteria_em_atendimento = [
-        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '2'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
-    em_atendimento_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=criteria_em_atendimento,
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
+    novos = _count_by_status_in_range(STATUS_NEW)
+    em_atendimento = _count_by_status_in_range(STATUS_ASSIGNED)
 
     # Pendentes (status 4)
-    criteria_pendentes = [
-        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '4'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
-    pendentes_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=criteria_pendentes,
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
+    pendentes = _count_by_status_in_range(STATUS_PENDING)
 
-    # Planejados (status 2 - Em progresso/Atribuído)
-    # Ajuste: Planejados devem refletir status 3 (Planejado),
-    # alinhando com os totais globais.
-    criteria_planejados = [
-        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '3'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
-    planejados_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=criteria_planejados,
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
+    # Planejados (status 3 - Planejado)
+    # Alinhado com os totais globais.
+    planejados = _count_by_status_in_range(STATUS_PLANNED)
 
     # Resolvidos devem incluir Solucionados (5) e Fechados (6)
-    criteria_resolvidos_5 = [
-        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '5'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
-    resolvidos_5_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=criteria_resolvidos_5,
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
-
-    criteria_resolvidos_6 = [
-        {'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '6'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'morethan', 'value': f'{inicio} 00:00:00'},
-        {'link': 'AND', 'field': FIELD_CREATED, 'searchtype': 'lessthan', 'value': f'{fim} 23:59:59'},
-    ]
-    resolvidos_6_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=criteria_resolvidos_6,
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
+    resolvidos = _count_by_status_in_range(STATUS_SOLVED) + _count_by_status_in_range(STATUS_CLOSED)
 
     return {
-        'novos': len(novos_data),
-        'em_atendimento': len(em_atendimento_data),
-        'pendentes': len(pendentes_data),
-        'planejados': len(planejados_data),
-        'resolvidos': (len(resolvidos_5_data) + len(resolvidos_6_data))
+        'novos': novos,
+        'em_atendimento': em_atendimento,
+        'pendentes': pendentes,
+        'planejados': planejados,
+        'resolvidos': resolvidos,
     }
 
 
@@ -139,7 +81,7 @@ def generate_status_totals(
         headers=session_headers,
         api_url=api_url,
         itemtype='Ticket',
-        criteria=[{'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '1'}],
+        criteria=add_status([], '1'),
         forcedisplay=[FIELD_ID],
         uid_cols=False
     )
@@ -149,7 +91,7 @@ def generate_status_totals(
         headers=session_headers,
         api_url=api_url,
         itemtype='Ticket',
-        criteria=[{'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '2'}],
+        criteria=add_status([], '2'),
         forcedisplay=[FIELD_ID],
         uid_cols=False
     )
@@ -159,7 +101,7 @@ def generate_status_totals(
         headers=session_headers,
         api_url=api_url,
         itemtype='Ticket',
-        criteria=[{'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '4'}],
+        criteria=add_status([], '4'),
         forcedisplay=[FIELD_ID],
         uid_cols=False
     )
@@ -169,41 +111,40 @@ def generate_status_totals(
         headers=session_headers,
         api_url=api_url,
         itemtype='Ticket',
-        criteria=[{'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '3'}],
+        criteria=add_status([], '3'),
         forcedisplay=[FIELD_ID],
         uid_cols=False
     )
 
     # Solucionados (5)
-    solucionados_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=[{'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '5'}],
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
+    def _count_by_status_total(status: int | str) -> int:
+        data = glpi_client.search_paginated(
+            headers=session_headers,
+            api_url=api_url,
+            itemtype='Ticket',
+            criteria=add_status([], status),
+            forcedisplay=[FIELD_ID],
+            uid_cols=False,
+        )
+        return len(data)
 
-    # Fechados (6)
-    fechados_data = glpi_client.search_paginated(
-        headers=session_headers,
-        api_url=api_url,
-        itemtype='Ticket',
-        criteria=[{'field': FIELD_STATUS, 'searchtype': 'equals', 'value': '6'}],
-        forcedisplay=[FIELD_ID],
-        uid_cols=False
-    )
+    novos_data = _count_by_status_total(STATUS_NEW)
+    status2_data = _count_by_status_total(STATUS_ASSIGNED)
+    status4_data = _count_by_status_total(STATUS_PENDING)
+    planejados_data = _count_by_status_total(STATUS_PLANNED)
+    solucionados_data = _count_by_status_total(STATUS_SOLVED)
+    fechados_data = _count_by_status_total(STATUS_CLOSED)
 
-    em_atendimento = len(status2_data)
-    nao_solucionados = em_atendimento + len(status4_data)
-    resolvidos = len(solucionados_data) + len(fechados_data)
+    em_atendimento = status2_data
+    nao_solucionados = em_atendimento + status4_data
+    resolvidos = solucionados_data + fechados_data
 
     return {
-        'novos': len(novos_data),
+        'novos': novos_data,
         'em_atendimento': em_atendimento,
         'nao_solucionados': nao_solucionados,
-        'planejados': len(planejados_data),
-        'solucionados': len(solucionados_data),
-        'fechados': len(fechados_data),
+        'planejados': planejados_data,
+        'solucionados': solucionados_data,
+        'fechados': fechados_data,
         'resolvidos': resolvidos,
     }

@@ -5,87 +5,108 @@ import type {
   MaintenanceNewTicketItem,
   TechnicianRankingItem,
 } from '../types/maintenance-api.d';
+import { APIError, formatApiError } from './errors';
 
-// Prefixo da API de manutenção
-// Fallback absoluto para backend local se variável não estiver definida
-const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-const API_BASE_URL = env?.VITE_API_BASE_URL ?? 'http://127.0.0.1:8010/api/v1';
+// Base da API e prefixo de versão (uso direto para permitir substituição estática do Vite)
+const RAW_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const RAW_VERSION = (import.meta.env.VITE_API_VERSION_PREFIX as string | undefined) ?? '/api/v1';
 
-/**
- * Função genérica para buscar dados da API de Manutenção
- */
-async function fetchFromAPI<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`);
+// Normaliza partes da URL evitando erros de "Invalid base URL"
+function trimTrailingSlash(s: string): string {
+  return s.replace(/\/$/, '');
+}
+
+function ensureLeadingSlash(s: string): string {
+  return s.startsWith('/') ? s : `/${s}`;
+}
+
+// Resolve origem e prefixo de path conforme ambiente
+let API_BASE_ORIGIN: string;
+let API_PATH_PREFIX: string;
+if (RAW_BASE && RAW_BASE.startsWith('/')) {
+  // Base relativa atrás de Nginx: usa a origem atual do browser
+  API_BASE_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+  API_PATH_PREFIX = trimTrailingSlash(RAW_BASE);
+} else if (RAW_BASE) {
+  // Base absoluta fornecida (dev externo): respeita host e porta
+  API_BASE_ORIGIN = trimTrailingSlash(RAW_BASE);
+  API_PATH_PREFIX = ensureLeadingSlash(RAW_VERSION);
+} else {
+  // Fallback: mesma origem com prefixo padrão
+  API_BASE_ORIGIN = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000';
+  API_PATH_PREFIX = ensureLeadingSlash(RAW_VERSION);
+}
+
+function buildURL(endpoint: string, query?: Record<string, unknown>) {
+  const base = trimTrailingSlash(API_BASE_ORIGIN);
+  const prefix = trimTrailingSlash(API_PATH_PREFIX);
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  let url = `${base}${prefix}${path}`;
+  if (query) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null) continue;
+      params.append(key, String(value));
+    }
+    const q = params.toString();
+    if (q) url += `?${q}`;
+  }
+  return url;
+}
+
+async function fetchFromAPI<T>(endpoint: string, init?: RequestInit & { query?: Record<string, unknown> }): Promise<T> {
+  const url = buildURL(endpoint, init?.query);
+  const { query: _ignored, headers, ...rest } = init ?? {};
+  const isJsonBody = rest.body && typeof rest.body === 'string';
+  const mergedHeaders = {
+    ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
+    ...headers,
+  } as HeadersInit;
+
+  const response = await fetch(url, { method: rest.method ?? 'GET', headers: mergedHeaders, body: rest.body });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      detail: `Erro de rede: ${response.statusText} ao acessar o endpoint ${endpoint}`,
-    }));
-    throw new Error(errorData.detail || 'Ocorreu um erro desconhecido na API.');
+    let detail: string | undefined;
+    try {
+      const data = await response.json();
+      detail = (data && (data.detail || data.error)) as string | undefined;
+    } catch {
+      // Ignorar parsing errors
+    }
+    const message = formatApiError(endpoint, response.status, response.statusText, detail);
+    throw new APIError(endpoint, message, response.status, detail);
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
 // Endpoints específicos para Manutenção
 
 export const fetchMaintenanceGeneralStats = (inicio?: string, fim?: string) => {
-  const qs = inicio && fim ? `?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}` : '';
-  return fetchFromAPI<MaintenanceGeneralStats>(`/manutencao/stats-gerais${qs}`);
+  return fetchFromAPI<MaintenanceGeneralStats>(`/manutencao/stats-gerais`, { query: { inicio, fim } });
 };
 
 export const fetchEntityRanking = (inicio?: string, fim?: string, top: number = 10) => {
-  const qs = inicio && fim ? `?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}&top=${top}` : '';
-  return fetchFromAPI<EntityRankingItem[]>(`/manutencao/ranking-entidades${qs}`);
+  return fetchFromAPI<EntityRankingItem[]>(`/manutencao/ranking-entidades`, { query: { inicio, fim, top } });
 };
 
 export const fetchCategoryRanking = (inicio?: string, fim?: string, top: number = 10) => {
-  const qs = inicio && fim ? `?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}&top=${top}` : '';
-  return fetchFromAPI<CategoryRankingItem[]>(`/manutencao/ranking-categorias${qs}`);
+  return fetchFromAPI<CategoryRankingItem[]>(`/manutencao/ranking-categorias`, { query: { inicio, fim, top } });
 };
 
 export const fetchMaintenanceNewTickets = (limit: number = 10) => {
-  return fetchFromAPI<MaintenanceNewTicketItem[]>(`/manutencao/tickets-novos?limit=${limit}`);
-};
-
-// Top atribuição por entidades (global, sem filtro de datas)
-export const fetchTopEntityAttribution = (top: number = 10) => {
-  return fetchFromAPI<EntityRankingItem[]>(`/manutencao/top-atribuicao-entidades?top=${top}`);
-};
-
-// Top atribuição por categorias (global, sem filtro de datas)
-export const fetchTopCategoryAttribution = (top: number = 10) => {
-  return fetchFromAPI<CategoryRankingItem[]>(`/manutencao/top-atribuicao-categorias?top=${top}`);
+  return fetchFromAPI<MaintenanceNewTicketItem[]>(`/manutencao/tickets-novos`, { query: { limit } });
 };
 
 // Ranking de Técnicos (por período). Se o endpoint não existir ainda, retorna [] ao invés de falhar.
 export const fetchTechnicianRanking = async (inicio?: string, fim?: string, top: number = 10) => {
-  const qs = inicio && fim ? `?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}&top=${top}` : `?top=${top}`;
-  const url = `${API_BASE_URL}/manutencao/ranking-tecnicos${qs}`;
-  // Guardar último valor válido para evitar "piscar" vazio em erros intermitentes
-  // Escopo de módulo: persiste enquanto a página estiver carregada
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const globalAny = globalThis as any;
-  if (!globalAny.__lastTechnicianRanking) {
-    globalAny.__lastTechnicianRanking = [] as TechnicianRankingItem[];
-  }
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      // Tratar 404/501 como ausência de dados, para não quebrar o layout
-      if (response.status === 404 || response.status === 501) {
-        // manter último conhecido, mesmo que vazio inicialmente
-        return globalAny.__lastTechnicianRanking as TechnicianRankingItem[];
-      }
-      const errorData = await response.json().catch(() => ({ detail: `Erro ${response.status} ao acessar ${url}` }));
-      throw new Error(errorData.detail || `Falha ao buscar ranking de técnicos`);
-    }
-    const data = (await response.json()) as TechnicianRankingItem[];
-    globalAny.__lastTechnicianRanking = data;
-    return data;
+    return await fetchFromAPI<TechnicianRankingItem>(`/manutencao/ranking-tecnicos`, { query: { inicio, fim, top } }) as unknown as TechnicianRankingItem[];
   } catch (err) {
-    console.error('Erro de rede ao buscar ranking de técnicos:', err);
-    // Retornar último valor válido ao invés de zerar
-    return globalAny.__lastTechnicianRanking as TechnicianRankingItem[];
+    if (err instanceof APIError && (err.status === 404 || err.status === 501)) {
+      // Considera ausência de dados sem quebrar o layout
+      return [] as TechnicianRankingItem[];
+    }
+    throw err;
   }
 };

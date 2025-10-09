@@ -19,11 +19,12 @@ WORKDIR /app
 # Instala Nginx e dependências mínimas
 RUN apt-get update && apt-get install -y --no-install-recommends nginx && rm -rf /var/lib/apt/lists/*
 
+# Copia requirements e instala dependências do backend
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+
 # Copia backend
 COPY backend/ /app/backend/
-
-# Instala libs Python necessárias
-RUN pip install --no-cache-dir fastapi uvicorn requests
 
 # Copia build do frontend para Nginx
 COPY --from=frontend_build /app/frontend/dist /usr/share/nginx/html/dashboard

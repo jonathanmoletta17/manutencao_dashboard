@@ -21,308 +21,50 @@ import {
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-  import { 
-    fetchMaintenanceGeneralStats,
-    fetchMaintenanceNewTickets,
-    fetchEntityRanking,
-    fetchCategoryRanking,
-    fetchTechnicianRanking
-  } from './services/maintenance-api';
-  import type { 
-    MaintenanceGeneralStats,
-    EntityRankingItem, 
-    CategoryRankingItem,
-    MaintenanceNewTicketItem,
-    TechnicianRankingItem
-  } from './types/maintenance-api.d';
   import { DateRangePicker } from './components/DateRangePicker';
   import { TopNSelect } from './components/TopNSelect';
   import TechnicianRanking from './components/TechnicianRanking';
+  import { 
+    readTopNFromUrl,
+    readDateRangeFromUrl,
+    replaceUrlParams,
+  } from './services/url_params';
+  import { useDashboardData } from './hooks/useDashboardData';
+  import { useCategoryGrouping } from './hooks/useCategoryGrouping';
+  import { useCarousel } from './hooks/useCarousel';
+  import { fmt, fmtDateTimeParts, fmtTimeOfDay } from './utils/format';
+  import { stripParentPrefix, abbreviateEntityName } from './utils/entity';
+  import { useClock } from './hooks/useClock';
 
 export default function MaintenanceDashboard() {
-  const [generalStats, setGeneralStats] = useState<MaintenanceGeneralStats | null>(null);
-  
-  const [entityRanking, setEntityRanking] = useState<EntityRankingItem[] | null>(null);
-  const [categoryRanking, setCategoryRanking] = useState<CategoryRankingItem[] | null>(null);
-  const [technicianRanking, setTechnicianRanking] = useState<TechnicianRankingItem[] | null>(null);
-  const [newTickets, setNewTickets] = useState<MaintenanceNewTicketItem[] | null>(null);
-  const [time, setTime] = useState<Date>(new Date());
-  const [topN, setTopN] = useState<number>(() => {
-    const url = new URL(window.location.href);
-    const qsTop = url.searchParams.get('top');
-    const n = qsTop ? Number(qsTop) : NaN;
-    const allowed = [5, 10, 20, 50];
-    return allowed.includes(n) ? n : 5;
-  });
-  const [dateRange, setDateRange] = useState<{ inicio: string; fim: string }>(() => {
-    const toYmd = (d: Date) => d.toISOString().slice(0, 10);
-    const url = new URL(window.location.href);
-    const qsInicio = url.searchParams.get('inicio');
-    const qsFim = url.searchParams.get('fim');
-    if (qsInicio && qsFim && qsInicio <= qsFim) {
-      return { inicio: qsInicio, fim: qsFim };
-    }
-    const now = new Date();
-    const end = new Date(now);
-    const start = new Date(now);
-    start.setDate(start.getDate() - 30);
-    return { inicio: toYmd(start), fim: toYmd(end) };
-  });
+  const time = useClock();
+  const [topN, setTopN] = useState<number>(() => readTopNFromUrl(window.location.href));
+  const [dateRange, setDateRange] = useState<{ inicio: string; fim: string }>(() => readDateRangeFromUrl(window.location.href));
 
-  const refreshInFlight = useRef(false);
-  const dateRangeRef = useRef(dateRange);
-  const topNRef = useRef(topN);
-  
-  useEffect(() => {
-    dateRangeRef.current = dateRange;
-  }, [dateRange]);
+  // Removidos refs; usamos estados atuais diretamente
 
-  useEffect(() => {
-    topNRef.current = topN;
-  }, [topN]);
+  // Helpers utilitários
 
-  const fmt = (n: number | undefined | null) =>
-    n !== undefined && n !== null
-      ? new Intl.NumberFormat('pt-BR').format(n)
-      : '-';
-
-  // Remove o prefixo do pai "Origem > PIRATINI" quando a entidade não é exatamente o pai
-  const stripParentPrefix = (name: string) => {
-    const PARENT = 'Origem > PIRATINI';
-    const s = (name || '').trim();
-    const norm = s.replace(/\s*>\s*/g, ' > ');
-    const lower = norm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const parentLower = PARENT.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    if (lower === parentLower) return s;
-    if (lower.startsWith(parentLower + ' > ')) return norm.slice(PARENT.length + 3).trim();
-    return s;
-  };
-
-  // Abreviação: usar apenas o primeiro e o último segmento, abreviando o primeiro por sigla conhecida ou acrônimo
-  const abbreviateEntityName = (rawName: string) => {
-    const name = stripParentPrefix(rawName ?? '');
-    const norm = name.replace(/\s*>\s*/g, ' > ').trim();
-    if (!norm) return name;
-    // Caso especial: quando a entidade É exatamente "Origem > Piratini",
-    // manter o nome completo sem abreviar "Origem".
-    const normLower = norm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    if (normLower === 'origem > piratini') {
-      return norm;
-    }
-    const parts = norm.split(' > ').map((p) => p.trim()).filter(Boolean);
-    if (parts.length <= 1) return parts[0] ?? name;
-    const first = parts[0];
-    const last = parts[parts.length - 1];
-
-    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const SIGLAS_PRIMEIRO: Record<string, string> = {
-      'casa civil': 'CC',
-      'gabinete do governador': 'GG',
-      'gabinete do vice-governador': 'GVG',
-      'secom': 'SECOM',
-      'casa militar': 'CM',
-    };
-    const firstKey = normalize(first);
-    let sigla = SIGLAS_PRIMEIRO[firstKey];
-    if (!sigla) {
-      const stop = new Set(['da','de','do','dos','das','e']);
-      const words = firstKey.split(/\s+/).filter((w) => w && !stop.has(w));
-      sigla = words.filter((w) => w.length >= 3).map((w) => w[0]).join('').slice(0,4).toUpperCase();
-      if (!sigla) sigla = (first.trim().slice(0,3) || first).toUpperCase();
-    }
-
-    if (!last || normalize(last) === firstKey) return first; // evita duplicação
-    return `${sigla} > ${last}`;
-  };
+  const { generalStats, entityRanking, categoryRanking, technicianRanking, newTickets, refresh, error } = useDashboardData(dateRange, topN);
 
   const applyDateRange = () => {
-    const { inicio, fim } = dateRangeRef.current;
-    const url = new URL(window.location.href);
-    url.searchParams.set('inicio', inicio);
-    url.searchParams.set('fim', fim);
-    url.searchParams.set('top', String(topNRef.current));
-    window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
-    loadDashboardData();
+    replaceUrlParams({ inicio: dateRange.inicio, fim: dateRange.fim }, topN);
+    refresh();
   };
 
-  const loadDashboardDataWith = async (inicio?: string, fim?: string) => {
-    // Stats gerais por período
-    try {
-      const inRange = inicio ?? dateRangeRef.current.inicio;
-      const endRange = fim ?? dateRangeRef.current.fim;
-      const gs = await fetchMaintenanceGeneralStats(inRange, endRange);
-      setGeneralStats(gs);
-    } catch (err) {
-      console.error('Falha ao buscar Estatísticas Gerais:', err);
-    }
-
-    // Ranking por entidades filtrado por período (como stats gerais)
-    try {
-      const inRange = inicio ?? dateRangeRef.current.inicio;
-      const endRange = fim ?? dateRangeRef.current.fim;
-      const topParam = topNRef.current;
-      const er = await fetchEntityRanking(inRange, endRange, topParam);
-      setEntityRanking(er);
-    } catch (err) {
-      console.error('Falha ao buscar Ranking de Entidades (por período):', err);
-    }
-
-    // Ranking por categorias filtrado por período
-    // Para garantir itens suficientes em cada macro área, buscamos 3x TopN
-    try {
-      const inRange = inicio ?? dateRangeRef.current.inicio;
-      const endRange = fim ?? dateRangeRef.current.fim;
-      const topParam = topNRef.current;
-      const cr = await fetchCategoryRanking(inRange, endRange, Math.max(topParam * 3, 15));
-      setCategoryRanking(cr);
-    } catch (err) {
-      console.error('Falha ao buscar Ranking de Categorias (por período):', err);
-    }
-
-    try {
-      const nt = await fetchMaintenanceNewTickets(8);
-      setNewTickets(nt);
-    } catch (err) {
-      console.error('Falha ao buscar Tickets Novos:', err);
-    }
-
-    // Ranking de técnicos (sem níveis na manutenção)
-    try {
-      const inRange = inicio ?? dateRangeRef.current.inicio;
-      const endRange = fim ?? dateRangeRef.current.fim;
-      const topParam = topNRef.current;
-      const tk = await fetchTechnicianRanking(inRange, endRange, topParam);
-      setTechnicianRanking(tk);
-    } catch (err) {
-      console.error('Falha ao buscar Ranking de Técnicos:', err);
-    }
-
-    // Em atendimento agora vem do stats-gerais (com filtro de datas)
-  };
-
-  // Wrapper para recarregar dados usando o intervalo atual
-  const loadDashboardData = async () => {
-    const { inicio, fim } = dateRangeRef.current;
-    await loadDashboardDataWith(inicio, fim);
-  };
-
+  // Persistir Top N no URL sempre que o usuário alterar (evita duplicação)
   useEffect(() => {
-    (async () => {
-      const { inicio, fim } = dateRangeRef.current;
-      await loadDashboardDataWith(inicio, fim);
-    })();
-  }, []);
+    replaceUrlParams({ inicio: dateRange.inicio, fim: dateRange.fim }, topN);
+  }, [topN, dateRange]);
 
-  // Atualizar dados quando Top N mudar
-  useEffect(() => {
-    const { inicio, fim } = dateRangeRef.current;
-    loadDashboardDataWith(inicio, fim);
-  }, [topN]);
-
-  // Persistir Top N no URL sempre que o usuário alterar
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('top', String(topN));
-    window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
-  }, [topN]);
-
-  // Polling configurável via .env (usa apenas VITE_REALTIME_POLL_INTERVAL_SEC)
-  useEffect(() => {
-    const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-    const rawPollSec = env?.VITE_REALTIME_POLL_INTERVAL_SEC;
-    const intervalMs = rawPollSec !== undefined ? Number(rawPollSec) * 1000 : 15000;
-    const id = setInterval(async () => {
-      if (refreshInFlight.current) return;
-      refreshInFlight.current = true;
-      try {
-        const { inicio, fim } = dateRangeRef.current;
-        await loadDashboardDataWith(inicio, fim);
-      } finally {
-        refreshInFlight.current = false;
-      }
-    }, intervalMs);
-    return () => clearInterval(id);
-  }, []);
-
-  // Relógio
-  useEffect(() => {
-    const id = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Relógio movido para useClock
 
   // Totais de status agora são atualizados junto ao polling em loadDashboardDataWith
 
   // ====== Classificação por macro área e carrossel ======
-  const removeDiacritics = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s;
-  const classifyMacroArea = useCallback((label: string) => {
-    if (!label) return null;
-    const first = label.split('>', 1)[0].trim();
-    const plain = removeDiacritics(first).toLowerCase();
-    if (plain.startsWith('manutencao')) return 'Manutenção' as const;
-    if (plain.startsWith('conservacao')) return 'Conservação' as const;
-    return null;
-  }, []);
-
-  const { manCategories, consCategories } = useMemo(() => {
-    const man: CategoryRankingItem[] = [];
-    const cons: CategoryRankingItem[] = [];
-    (categoryRanking ?? []).forEach((item) => {
-      const raw = (item.category_name ?? '').trim();
-      const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-      // Ocultar itens inválidos como 'None', 'null' ou vazio
-      if (!raw || norm === 'none' || norm === 'null') return;
-      const grp = classifyMacroArea(item.category_name);
-      if (grp === 'Manutenção') man.push(item);
-      else if (grp === 'Conservação') cons.push(item);
-      // Ignora itens fora das macro áreas conhecidas
-    });
-    // ordenar por ticket_count desc para garantir Top 5 correto por grupo
-    man.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
-    cons.sort((a, b) => (b.ticket_count ?? 0) - (a.ticket_count ?? 0));
-    return { manCategories: man, consCategories: cons };
-  }, [categoryRanking, classifyMacroArea]);
-
-  const [currentCategoryArea, setCurrentCategoryArea] = useState<'Manutenção' | 'Conservação'>('Manutenção');
+  const { manCategories, consCategories } = useCategoryGrouping(categoryRanking);
   const areas: ReadonlyArray<'Manutenção' | 'Conservação'> = ['Manutenção', 'Conservação'] as const;
-  const pauseUntilRef = useRef<number>(0);
-  const PAUSE_MS = 20000;
-  const schedulePause = useCallback(() => {
-    pauseUntilRef.current = Date.now() + PAUSE_MS;
-  }, []);
-
-  const goPrevArea = useCallback(() => {
-    setCurrentCategoryArea((prev) => {
-      const idx = areas.indexOf(prev);
-      const nextIdx = (idx - 1 + areas.length) % areas.length;
-      return areas[nextIdx];
-    });
-    schedulePause();
-  }, [areas, schedulePause]);
-
-  const goNextArea = useCallback(() => {
-    setCurrentCategoryArea((prev) => {
-      const idx = areas.indexOf(prev);
-      const nextIdx = (idx + 1) % areas.length;
-      return areas[nextIdx];
-    });
-    schedulePause();
-  }, [areas, schedulePause]);
-
-  useEffect(() => {
-    const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-    const rawCarouselMs = env?.VITE_CATEGORY_CAROUSEL_INTERVAL_MS;
-    const rawCarouselSec = env?.VITE_CATEGORY_CAROUSEL_INTERVAL_SEC;
-    const intervalMs = rawCarouselMs !== undefined
-      ? Number(rawCarouselMs)
-      : rawCarouselSec !== undefined
-        ? Number(rawCarouselSec) * 1000
-        : 15000;
-    const id = setInterval(() => {
-      if (Date.now() < pauseUntilRef.current) return;
-      setCurrentCategoryArea((prev) => (prev === 'Manutenção' ? 'Conservação' : 'Manutenção'));
-    }, intervalMs);
-    return () => clearInterval(id);
-  }, []);
+  const { current: currentCategoryArea, setCurrent: setCurrentCategoryArea, goPrev: goPrevArea, goNext: goNextArea, schedulePause } = useCarousel(areas, 'Manutenção');
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -343,7 +85,7 @@ export default function MaintenanceDashboard() {
             onApply={applyDateRange}
             className="w-auto"
           />
-          <Button variant="ghost" size="sm" className="text-white hover:bg-blue-600" onClick={loadDashboardData}>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-blue-600" onClick={refresh}>
             <RotateCcw className="w-4 h-4" />
           </Button>
           {/* Seletor Top N (dropdown customizado) */}
@@ -356,11 +98,18 @@ export default function MaintenanceDashboard() {
               <User className="w-4 h-4 text-white" />
             </div>
             <div className="text-sm">
-              <p className="text-blue-100 text-xs">{time.toLocaleTimeString('pt-BR')}</p>
+            <p className="text-blue-100 text-xs">{fmtTimeOfDay(time)}</p>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Erros globais do dashboard (ponto único de exibição) */}
+      {error && (
+        <div className="px-6 py-2 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Content - Layout otimizado para tela cheia */}
       <div className="p-6 h-[calc(100vh-64px)] flex flex-col gap-4 overflow-hidden">
@@ -536,12 +285,11 @@ export default function MaintenanceDashboard() {
                   ));
                 })()}
               </div>
-              {(
-                (!categoryRanking || categoryRanking.length === 0) ||
-                ((currentCategoryArea === 'Manutenção' ? manCategories : consCategories).length === 0)
-              ) && (
+              {(!categoryRanking || categoryRanking.length === 0) ? (
+                <div className="text-center text-xs text-gray-500 py-4">Ranking indisponível</div>
+              ) : ((currentCategoryArea === 'Manutenção' ? manCategories : consCategories).length === 0) ? (
                 <div className="text-center text-xs text-gray-500 py-4">Sem itens nesta área no período</div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
             </div>
@@ -561,7 +309,7 @@ export default function MaintenanceDashboard() {
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">{newTickets ? `${newTickets.length} tickets` : '0 tickets'}</span>
-                    <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100" onClick={loadDashboardData}>
+                    <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100" onClick={refresh}>
                       <RotateCcw className="w-4 h-4" />
                     </Button>
                   </div>
@@ -583,8 +331,12 @@ export default function MaintenanceDashboard() {
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-700 font-medium truncate" title={item.solicitante}>{item.solicitante}</span>
                           <div className="flex flex-col items-end w-48">
-                            <span className="text-gray-600 whitespace-nowrap">{(item.data || '').split(' ')[1] || ''}</span>
-                            <span className="text-gray-600 whitespace-nowrap">{(item.data || '').split(' ')[0] || item.data}</span>
+                            {(() => { const { time, date } = fmtDateTimeParts(item.data); return (
+                              <>
+                                <span className="text-gray-600 whitespace-nowrap">{time}</span>
+                                <span className="text-gray-600 whitespace-nowrap">{date}</span>
+                              </>
+                            ); })()}
                           </div>
                         </div>
                       </div>
