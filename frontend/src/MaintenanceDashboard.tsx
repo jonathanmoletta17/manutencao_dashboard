@@ -194,7 +194,10 @@ export default function MaintenanceDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
-                <div className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3">
+                <div
+                  className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
+                >
                   {(entityRanking ?? []).map((item, idx) => (
                     <div
                       key={idx}
@@ -277,7 +280,10 @@ export default function MaintenanceDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
-                <div className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3">
+                <div
+                  className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
+                >
                   {(() => {
                     const items = (
                       currentCategoryArea === 'Manutenção' ? manCategories : consCategories
