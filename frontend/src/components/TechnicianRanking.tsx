@@ -58,8 +58,8 @@ export function TechnicianRanking({ items, title = 'Ranking de Técnicos' }: Tec
                 const isThird = idx === 2;
                 const isTop3 = isFirst || isSecond || isThird;
                 const baseClasses = isTop3
-                  ? 'flex-shrink-0 w-56 bg-gradient-to-br text-white p-3 rounded-lg shadow-sm'
-                  : 'flex-shrink-0 w-56 bg-gray-50 border border-gray-200 text-gray-900 p-3 rounded-lg shadow-sm';
+                  ? 'flex-shrink-0 w-[143px] h-[117px] overflow-hidden bg-gradient-to-br text-white p-3 rounded-lg shadow-sm'
+                  : 'flex-shrink-0 w-[143px] h-[117px] overflow-hidden bg-gray-50 border border-gray-200 text-gray-900 p-3 rounded-lg shadow-sm';
                 const gradientClasses = isFirst
                   ? 'from-[#5A9BD4] to-[#4A8BC2]'
                   : isSecond
