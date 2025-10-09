@@ -94,10 +94,10 @@ Observações operacionais:
 
 ## Mudanças de layout
 
-- Reposicionamento dos Tickets Novos para a linha superior e expansão do Ranking de Técnicos para ocupar toda a largura disponível, mantendo responsividade:
+- Correção do layout mantendo duas colunas e o comportamento original dos blocos, com o Ranking de Técnicos ocupando a largura total abaixo das colunas:
   - Arquivo: `src/MaintenanceDashboard.tsx`
   - Ajustes:
-    - Substituição do layout de duas colunas por uma seção superior para “Tickets Novos” em largura total.
-    - Conversão da área de rankings para `CSS Grid` (`grid-cols-1 md:grid-cols-2`) com `TechnicianRanking` ocupando ambas as colunas (`md:col-span-2`).
-    - Limitação de altura e rolagem vertical na lista de tickets (`max-h-[360px]` + `overflow-y-auto`) para preservar harmonia visual.
-  - Objetivo: melhorar a legibilidade do Ranking de Técnicos e utilizar toda a largura do contêiner, sem comprometer a hierarquia e o espaçamento dos blocos.
+    - Restauração do layout em duas colunas no conteúdo principal: rankings (Entidades e Categorias) à esquerda e "Tickets Novos" na sidebar à direita.
+    - Posicionamento do componente `TechnicianRanking` após essas duas colunas, ocupando toda a largura disponível.
+    - Manutenção da rolagem vertical na lista de tickets para evitar crescimento excessivo de altura.
+  - Objetivo: respeitar a hierarquia visual original, mantendo "Tickets Novos" na lateral e destacando o Ranking de Técnicos em largura total somente abaixo das colunas.
