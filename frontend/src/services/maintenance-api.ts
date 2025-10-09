@@ -101,7 +101,7 @@ export const fetchMaintenanceNewTickets = (limit: number = 10) => {
 // Ranking de Técnicos (por período). Se o endpoint não existir ainda, retorna [] ao invés de falhar.
 export const fetchTechnicianRanking = async (inicio?: string, fim?: string, top: number = 10) => {
   try {
-    return await fetchFromAPI<TechnicianRankingItem>(`/manutencao/ranking-tecnicos`, { query: { inicio, fim, top } }) as unknown as TechnicianRankingItem[];
+    return await fetchFromAPI<TechnicianRankingItem[]>(`/manutencao/ranking-tecnicos`, { query: { inicio, fim, top } });
   } catch (err) {
     if (err instanceof APIError && (err.status === 404 || err.status === 501)) {
       // Considera ausência de dados sem quebrar o layout

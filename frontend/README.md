@@ -25,7 +25,21 @@ Endpoints consumidos pelo dashboard:
 - `GET /api/v1/manutencao/tickets-novos?limit` — últimos tickets criados.
 
 Observação:
-- O endpoint `status-totais` não é consumido pelo dashboard; “Em atendimento” agora vem de `stats-gerais` com filtro de datas, garantindo consistência entre as cinco métricas.
+ - O dashboard utiliza apenas `stats-gerais` com filtro de datas para compor as métricas exibidas, incluindo “Em atendimento”.
+
+## Contratos de dados
+
+- As interfaces em `src/types/maintenance-api.d.ts` espelham os modelos Pydantic do backend e mantêm campos em `snake_case`.
+- Formatos e tipos:
+  - Datas em `MaintenanceNewTicketItem.data`: string no formato `dd/MM/yyyy HH:mm`.
+  - Contagens: números inteiros (`int` no backend, `number` no frontend).
+- As descrições de campos foram alinhadas entre backend (via `Field(description=...)`) e frontend (comentários JSDoc), facilitando navegação e validação.
+
+## Geração automática de tipos (avaliação)
+
+- Opção A (OpenAPI): usar `openapi-typescript` para gerar `src/types/openapi.d.ts` a partir de `http://127.0.0.1:8010/openapi.json`.
+- Opção B (Pydantic direto): usar `datamodel-code-generator` ou `pydantic2ts` para gerar tipos a partir dos modelos Python.
+- Recomenda-se a abordagem OpenAPI por cobrir todos os contratos (inclui rotas e schemas) e manter-se estável com FastAPI.
 
 ## Configuração do carrossel de categorias
 

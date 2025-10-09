@@ -7,10 +7,7 @@ Endpoints
   - Campos: Novos (1), Em atendimento (2), Pendentes (4), Planejados (3), Resolvidos (5+6).
   - Usa cache com TTL (`CACHE_TTL_SEC`).
 
-- `GET /api/v1/manutencao/status-totais`
-  - Totais gerais por status, sem filtro de datas.
-  - Campos: Novos (1), Em atendimento (2), Não solucionados (2+4), Planejados (3), Solucionados (5), Fechados (6), Resolvidos (5+6).
-  - Usa cache com TTL (`CACHE_TTL_SEC`).
+<!-- Endpoint removido por duplicidade com métricas por período (stats-gerais) -->
 
 - `GET /api/v1/manutencao/top-atribuicao-entidades?top=10`
   - Ranking global por entidade com contagem de tickets.
@@ -93,7 +90,6 @@ Configuração de cache e entidade
 - `GLPI_CHANGE_ENTITY`: controla troca de entidade ativa (default habilitado: `1`). Pode ser desabilitado com `0`/`false` ou via parâmetro `change_entity=False` em `authenticate(...)`.
   - `planejados`: tickets com `STATUS_PLANNED` dentro do intervalo.
   - `resolvidos`: soma de `STATUS_SOLVED` + `STATUS_CLOSED` dentro do intervalo.
-- `status-totais` (sem período):
   - `novos`: total com `STATUS_NEW`.
   - `em_atendimento`: total com `STATUS_ASSIGNED`.
   - `nao_solucionados`: soma de `STATUS_ASSIGNED` + `STATUS_PENDING` (em atendimento ou pendente).
