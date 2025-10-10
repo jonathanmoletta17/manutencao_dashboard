@@ -76,7 +76,7 @@ export function TechnicianRanking({ items, title = 'Ranking de Técnicos' }: Tec
                       <Badge className={`${badgeClasses} mb-2 font-medium text-xs`} variant={isTop3 ? undefined : 'outline'}>
                         #{idx + 1}
                       </Badge>
-                      <p className={`text-xs font-semibold mb-2 text-gray-900`}>{tech.tecnico}</p>
+                      <p className={`text-xs font-semibold mb-2 ${isTop3 ? 'text-white' : 'text-gray-900'}`}>{tech.tecnico}</p>
                       <div className="space-y-1">
                         <div className="text-xs">
                           <span className={`${isTop3 ? (isFirst ? 'text-blue-100' : isSecond ? 'text-slate-200' : 'text-orange-100') : 'text-gray-600'}`}>Tickets:</span>
