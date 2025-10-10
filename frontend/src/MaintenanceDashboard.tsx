@@ -70,7 +70,7 @@ export default function MaintenanceDashboard() {
         <div className="flex items-center gap-4">
           <Wrench className="w-6 h-6" />
           <div>
-            <h1 className="text-xl font-semibold">Divisão de Manutenção</h1>
+            <h1 className="text-xl font-semibold">Departamento de Manutenção e Conservação</h1>
             <p className="text-sm text-blue-100">Dashboard de Métricas</p>
           </div>
         </div>
@@ -193,9 +193,9 @@ export default function MaintenanceDashboard() {
                   {`Ranking por Entidades`}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
+              <CardContent className="px-2 pb-0 flex-1 min-h-0 overflow-hidden">
                 <div
-                  className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
+                  className="h-full min-h-0 overflow-y-auto px-2 space-y-3 pt-3 pb-3 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
                   style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
                 >
                   {(entityRanking ?? []).map((item, idx) => (
@@ -279,9 +279,9 @@ export default function MaintenanceDashboard() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="px-4 pb-0 flex-1 min-h-0 overflow-hidden">
+              <CardContent className="px-2 pb-0 flex-1 min-h-0 overflow-hidden">
                 <div
-                  className="h-full min-h-0 overflow-y-auto pr-4 space-y-3 pt-3 pb-3 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
+                  className="h-full min-h-0 overflow-y-auto px-2 space-y-3 pt-3 pb-3 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
                   style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
                 >
                   {(() => {
@@ -325,9 +325,9 @@ export default function MaintenanceDashboard() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-0 flex-1 overflow-hidden">
+              <CardContent className="flex-1 overflow-hidden px-2">
                 <div 
-                  className="h-full overflow-y-auto px-6 pb-6 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
+                  className="h-full overflow-y-auto px-2 pb-6 [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-slate-100 [&::-webkit-scrollbar-track]:rounded-sm [&::-webkit-scrollbar-thumb]:bg-[#5A9BD4] [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-[#4A8BC2]"
                   style={{ scrollbarWidth: 'thin', scrollbarColor: '#5A9BD4 #f1f5f9' }}
                 >
                   <div className="space-y-3">

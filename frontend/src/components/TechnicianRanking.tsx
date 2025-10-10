@@ -9,15 +9,6 @@ interface TechnicianRankingProps {
   title?: string;
 }
 
-const shortName = (name: string) => {
-  const parts = (name || '').trim().split(/\s+/);
-  if (parts.length === 0) return '-';
-  if (parts.length === 1) return parts[0];
-  const first = parts[0];
-  const lastInitial = parts[parts.length - 1].charAt(0);
-  return `${first} ${lastInitial}.`;
-};
-
 // usa utilitário compartilhado fmt
 
 export function TechnicianRanking({ items, title = 'Ranking de Técnicos' }: TechnicianRankingProps) {
@@ -46,20 +37,20 @@ export function TechnicianRanking({ items, title = 'Ranking de Técnicos' }: Tec
               const canScrollHorizontally = target.scrollWidth > target.clientWidth;
               if (!canScrollHorizontally) return;
               if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
-                e.preventDefault();
+                if (e.cancelable) e.preventDefault();
                 target.scrollLeft += e.deltaY;
               }
             }}
           >
-            <div className="inline-flex w-max gap-3">
+            <div className="inline-flex w-max gap-3 pb-2">
               {list.map((tech, idx) => {
                 const isFirst = idx === 0;
                 const isSecond = idx === 1;
                 const isThird = idx === 2;
                 const isTop3 = isFirst || isSecond || isThird;
                 const baseClasses = isTop3
-                  ? 'flex-shrink-0 w-[143px] h-[117px] overflow-hidden bg-gradient-to-br text-white p-3 rounded-lg shadow-sm'
-                  : 'flex-shrink-0 w-[143px] h-[117px] overflow-hidden bg-gray-50 border border-gray-200 text-gray-900 p-3 rounded-lg shadow-sm';
+                  ? 'flex-shrink-0 overflow-hidden bg-gradient-to-br text-white p-3 rounded-lg shadow-sm'
+                  : 'flex-shrink-0 overflow-hidden bg-gray-50 border border-gray-200 text-gray-900 p-3 rounded-lg shadow-sm';
                 const gradientClasses = isFirst
                   ? 'from-[#5A9BD4] to-[#4A8BC2]'
                   : isSecond
@@ -76,13 +67,16 @@ export function TechnicianRanking({ items, title = 'Ranking de Técnicos' }: Tec
                   : '';
 
                 return (
-                  <div key={`${tech.tecnico}-${idx}`} className={`${baseClasses} ${gradientClasses}`}>
+                  <div
+                    key={`${tech.tecnico}-${idx}`}
+                    className={`${baseClasses} ${gradientClasses}`}
+                    style={{ width: 143, height: 117 }}
+                  >
                     <div className="text-center">
                       <Badge className={`${badgeClasses} mb-2 font-medium text-xs`} variant={isTop3 ? undefined : 'outline'}>
                         #{idx + 1}
                       </Badge>
-                      <p className={`text-xs font-medium mb-1 ${isTop3 ? '' : 'text-gray-900'}`}>{shortName(tech.tecnico)}</p>
-                      <p className={`text-xs mb-2 ${isFirst ? 'text-blue-100' : isSecond ? 'text-slate-200' : isThird ? 'text-orange-100' : 'text-gray-600'}`}>{tech.tecnico}</p>
+                      <p className={`text-xs font-semibold mb-2 text-gray-900`}>{tech.tecnico}</p>
                       <div className="space-y-1">
                         <div className="text-xs">
                           <span className={`${isTop3 ? (isFirst ? 'text-blue-100' : isSecond ? 'text-slate-200' : 'text-orange-100') : 'text-gray-600'}`}>Tickets:</span>
