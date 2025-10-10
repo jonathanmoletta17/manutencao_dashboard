@@ -208,69 +208,6 @@ def search_paginated(
         raise GLPINetworkError(f"Falha de rede na busca paginada de {itemtype}")
 
 
-def search_totalcount(
-    headers: Dict[str, str],
-    api_url: str,
-    itemtype: str,
-    criteria: Optional[List[Dict]] = None,
-    uid_cols: bool = True,
-    extra_params: Optional[Dict[str, Any]] = None,
-    timeout: tuple[int, int] = (2, 4),
-) -> int:
-    """
-    Busca rápida retornando apenas o totalcount para um itemtype.
-
-    Executa uma chamada única com `range=0-0` para que o GLPI
-    devolva somente o total de registros que atendem aos critérios.
-
-    Args:
-        headers: Headers com session-token
-        api_url: URL base da API GLPI
-        itemtype: Tipo do item para busca (ex.: 'Ticket')
-        criteria: Critérios de filtro
-        uid_cols: Se deve usar uid_cols=1
-        extra_params: Parâmetros adicionais de busca (ex.: display_type, is_recursive)
-        timeout: Timeout (connect, read)
-
-    Returns:
-        Total de registros que atendem à busca
-    """
-    search_url = f"{api_url}/search/{itemtype}"
-    params = build_search_params(
-        uid_cols=uid_cols,
-        forcedisplay=None,
-        criteria=criteria,
-        extra_params=extra_params,
-    )
-    params['range'] = '0-0'
-
-    try:
-        logger.debug(
-            "GLPI search totalcount GET %s itemtype=%s params=%s",
-            search_url,
-            itemtype,
-            mask_sensitive_keys(params),
-        )
-        response = requests.get(search_url, headers=headers, params=params, timeout=timeout)
-        response.raise_for_status()
-        data = response.json()
-        return int(data.get('totalcount', 0) or 0)
-    except requests.exceptions.Timeout:
-        raise GLPINetworkError(f"Timeout na busca de totalcount de {itemtype}", timeout=True)
-    except requests.exceptions.HTTPError as e:
-        status = getattr(e.response, 'status_code', None)
-        body = ''
-        try:
-            body = getattr(e.response, 'text', '')
-        except Exception:
-            body = ''
-        logger.error("GLPI HTTP error (totalcount) itemtype=%s status=%s body=%s", itemtype, status, body)
-        if status in (401, 403):
-            raise GLPIAuthError("Falha de autenticação GLPI", status_code=status)
-        raise GLPISearchError(f"Erro HTTP na busca de totalcount de {itemtype} (status={status})", status_code=status)
-    except requests.exceptions.RequestException:
-        raise GLPINetworkError(f"Falha de rede na busca de totalcount de {itemtype}")
-
 def get_user_names_in_batch_with_fallback(headers: Dict[str, str], api_url: str, requester_ids: List[int]) -> Dict[int, str]:
     """
     Resolve nomes de usuários (requisitantes) a partir de seus IDs.

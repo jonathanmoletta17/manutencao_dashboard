@@ -3,8 +3,6 @@ Lógica de rankings (entidades e categorias) para o Dashboard de Manutenção
 Separada por responsabilidade (ranking)
 """
 from typing import Dict, List, Any
-import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from .. import glpi_client
 from .glpi_constants import (
     FIELD_CREATED, FIELD_ENTITY, FIELD_CATEGORY, FIELD_TECH,
@@ -389,69 +387,28 @@ def generate_technician_ranking(
         Lista de {tecnico, tickets} ordenada por count
     """
     # Critério de intervalo de datas consistente com os demais rankings
-    base_criteria = add_date_range([], inicio, fim, field=FIELD_CREATED)
+    criteria = add_date_range([], inicio, fim, field=FIELD_CREATED)
 
-    # Caminho rápido (fast-path): usar env MAINTENANCE_TECH_IDS para listar IDs de técnicos
-    # Ex.: MAINTENANCE_TECH_IDS="12,34,56"
-    env_ids = (os.getenv("MAINTENANCE_TECH_IDS") or "").strip()
+    # Buscar IDs de técnicos atribuídos diretamente do Ticket (display_type=2 retorna ID bruto)
+    tickets_data = glpi_client.search_paginated(
+        headers=session_headers,
+        api_url=api_url,
+        itemtype='Ticket',
+        criteria=criteria,
+        forcedisplay=[str(FIELD_TECH)],
+        uid_cols=False,
+        range_step=range_step_tickets,
+        extra_params={'display_type': display_type, 'is_recursive': is_recursive}
+    )
+
     id_counts: Dict[str, int] = {}
+    for row in tickets_data:
+        raw_val = row.get(str(FIELD_TECH))
+        key = normalize_tech_key(raw_val)
+        id_counts[key] = id_counts.get(key, 0) + 1
 
-    if env_ids:
-        tech_ids = [safe_int_id(s) for s in env_ids.split(',') if s.strip()]
-        tech_ids = [tid for tid in tech_ids if tid > 0]
-        if tech_ids:
-            def _criteria_for_tech(tid: int) -> list[dict]:
-                crit = list(base_criteria)
-                tech_crit = {
-                    'field': FIELD_TECH,
-                    'searchtype': 'equals',
-                    'value': str(tid),
-                    'link': 'AND',
-                }
-                crit.append(tech_crit)
-                return crit
-
-            def _count_for_tech(tid: int) -> int:
-                return glpi_client.search_totalcount(
-                    headers=session_headers,
-                    api_url=api_url,
-                    itemtype='Ticket',
-                    criteria=_criteria_for_tech(tid),
-                    uid_cols=False,
-                )
-
-            max_workers = min(10, max(1, len(tech_ids)))
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(_count_for_tech, tid): tid for tid in tech_ids}
-                for fut in as_completed(futures):
-                    tid = futures[fut]
-                    try:
-                        id_counts[str(tid)] = int(fut.result())
-                    except Exception:
-                        id_counts[str(tid)] = 0
-        else:
-            # Sem IDs válidos informados
-            id_counts = {}
-    else:
-        # Fallback: abordagem existente (lenta), contando por FIELD_TECH a partir dos tickets
-        tickets_data = glpi_client.search_paginated(
-            headers=session_headers,
-            api_url=api_url,
-            itemtype='Ticket',
-            criteria=base_criteria,
-            forcedisplay=[str(FIELD_TECH)],
-            uid_cols=False,
-            range_step=range_step_tickets,
-            extra_params={'display_type': display_type, 'is_recursive': is_recursive}
-        )
-
-        for row in tickets_data:
-            raw_val = row.get(str(FIELD_TECH))
-            key = normalize_tech_key(raw_val)
-            id_counts[key] = id_counts.get(key, 0) + 1
-
-        # Excluir do ranking o bucket de não atribuídos ('0' => "Sem técnico")
-        id_counts.pop('0', None)
+    # Excluir do ranking o bucket de não atribuídos ('0' => "Sem técnico")
+    id_counts.pop('0', None)
 
     if not id_counts:
         return []
