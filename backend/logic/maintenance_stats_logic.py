@@ -3,6 +3,7 @@ Lógica de métricas e totais de status para o Dashboard de Manutenção
 Separada por responsabilidade (stats)
 """
 from typing import Dict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .. import glpi_client
 from .glpi_constants import (
     FIELD_STATUS, FIELD_CREATED, FIELD_ID,
@@ -24,37 +25,49 @@ def generate_maintenance_stats(
         Dict com novos, pendentes, planejados, resolvidos
     """
     # Helpers internos para reduzir repetição e manter código limpo
-    def _count_by_status_in_range(status: int | str) -> int:
-        criteria = add_date_range(
+    def _criteria_for_status(status: int | str) -> list[dict]:
+        return add_date_range(
             add_status([], status),
             inicio,
             fim,
             field=FIELD_CREATED,
         )
-        data = glpi_client.search_paginated(
+
+    def _count_total(status: int | str) -> int:
+        return glpi_client.search_totalcount(
             headers=session_headers,
             api_url=api_url,
             itemtype='Ticket',
-            criteria=criteria,
-            forcedisplay=[FIELD_ID],
+            criteria=_criteria_for_status(status),
             uid_cols=False,
         )
-        return len(data)
 
+    # Paralelizar contagens por status para reduzir latência
+    status_map = {
+        'novos': STATUS_NEW,
+        'em_atendimento': STATUS_ASSIGNED,
+        'pendentes': STATUS_PENDING,
+        'planejados': STATUS_PLANNED,
+        'solucionados': STATUS_SOLVED,
+        'fechados': STATUS_CLOSED,
+    }
 
-    # Em atendimento (status 2 - Atribuído/Em progresso)
-    novos = _count_by_status_in_range(STATUS_NEW)
-    em_atendimento = _count_by_status_in_range(STATUS_ASSIGNED)
+    results: Dict[str, int] = {k: 0 for k in status_map.keys()}
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {executor.submit(_count_total, st): name for name, st in status_map.items()}
+        for fut in as_completed(futures):
+            name = futures[fut]
+            try:
+                results[name] = int(fut.result())
+            except Exception:
+                # Em caso de falha pontual, mantém zero e segue adiante
+                results[name] = 0
 
-    # Pendentes (status 4)
-    pendentes = _count_by_status_in_range(STATUS_PENDING)
-
-    # Planejados (status 3 - Planejado)
-    # Alinhado com os totais globais.
-    planejados = _count_by_status_in_range(STATUS_PLANNED)
-
-    # Resolvidos devem incluir Solucionados (5) e Fechados (6)
-    resolvidos = _count_by_status_in_range(STATUS_SOLVED) + _count_by_status_in_range(STATUS_CLOSED)
+    resolvidos = results['solucionados'] + results['fechados']
+    novos = results['novos']
+    em_atendimento = results['em_atendimento']
+    pendentes = results['pendentes']
+    planejados = results['planejados']
 
     return {
         'novos': novos,
