@@ -1,11 +1,11 @@
 # Execução e Operação do Manutenção Dashboard
 
-Este documento descreve, de forma objetiva, como configurar, instalar e executar o projeto, além de orientações para evitar implementações desnecessárias e complexidade de código.
+Este documento descreve como configurar e executar o projeto com FastAPI servindo a UI estática diretamente, sem Nginx, padronizando a porta 8000.
 
 ## Visão Geral
-- Backend: FastAPI (Uvicorn) servindo dados da GLPI.
-- Frontend: Vite/React, empacotado para produção.
-- Container único: Nginx serve o frontend em `/dashboard/` e faz proxy de `/api/` para o backend no mesmo container.
+- Backend: FastAPI (Uvicorn) servindo dados da GLPI e arquivos estáticos.
+- Frontend: Vite/React, empacotado e servido em `/dashboard/` pelo próprio FastAPI.
+- Container único: um serviço expõe `8000` para API e UI.
 
 ## Pré-requisitos
 - Docker Desktop instalado e em execução.
@@ -13,60 +13,50 @@ Este documento descreve, de forma objetiva, como configurar, instalar e executar
 
 ## Configuração
 - Copie `backend/.env.example` para `backend/.env` e preencha as variáveis (credenciais/endpoints GLPI).
-- O frontend, em produção, é servido sob `/dashboard/`. Por isso a base de build do Vite está configurada para `/dashboard/`.
+- O Vite já define a base em `/dashboard/` no `vite.config.ts` para o build de produção.
 
-## Executar (Container Único – recomendado)
-1. Subir o serviço:
-   - `docker compose -f docker-compose.single.yml up -d`
-   - Para reconstruir ao aplicar mudanças: `docker compose -f docker-compose.single.yml up --build -d`
-2. Validar saúde:
+## Executar (Produção simples com Docker Compose)
+1. Build sem cache:
+   - `docker compose build --no-cache --progress=plain`
+2. Subir o serviço:
+   - `docker compose up -d`
+3. Validar saúde:
    - `http://localhost:8000/health` → deve retornar `{"status":"ok"}`.
-3. Acessar o dashboard:
+4. Acessar o dashboard:
    - `http://localhost:8000/dashboard/`
-4. Parar serviço:
-   - `docker compose -f docker-compose.single.yml down`
-5. Limpar órfãos (se necessário):
-   - `docker compose -f docker-compose.single.yml up -d --remove-orphans`
+5. Parar serviço:
+   - `docker compose down`
 
-## Executar (Desenvolvimento – opcional, com hot-reload)
-1. Subir backend e frontend em containers:
-   - `docker compose -f docker-compose.dev.yml up --build -d`
-   - Backend: `http://127.0.0.1:8010/health`
-   - Frontend (Vite): `http://localhost:5002/`
-   - O Vite usa `VITE_API_BASE_URL=http://backend:8010/api/v1` (definido no compose dev).
+## Desenvolvimento (opcional)
+- Executar `npm run dev` no diretório `frontend/` para hot-reload da UI (porta 5002). O backend pode ser executado com Uvicorn localmente em outra porta. Em produção, a UI é servida por FastAPI.
 
 ## Endpoints principais
-- Stats gerais: `GET /api/v1/manutencao/stats-gerais?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
-- Ranking entidades: `GET /api/v1/manutencao/ranking-entidades?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
-- Ranking categorias: `GET /api/v1/manutencao/ranking-categorias?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
-- Ranking técnicos: `GET /api/v1/manutencao/ranking-tecnicos?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+- Saúde: `GET /health`
+- UI: `GET /dashboard/`
+- API de manutenção (exemplos):
+  - `GET /api/v1/manutencao/stats-gerais?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+  - `GET /api/v1/manutencao/ranking-entidades?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+  - `GET /api/v1/manutencao/ranking-categorias?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
+  - `GET /api/v1/manutencao/ranking-tecnicos?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
 
-## Boas práticas (evitar complexidade desnecessária)
-- Preferir o container único para operação: reduz dependências e pontos de falha.
-- Manter o Vite com base `/dashboard/` apenas no build (produção) e `/` no dev – já configurado no `vite.config.ts`.
-- Evitar duplicar serviços e portar múltiplos Nginx: o `frontend/nginx.single.conf` já cobre SPA e proxy.
-- Não introduzir frameworks adicionais de estado/roteamento sem necessidade; o dashboard é uma SPA simples.
+## Boas práticas
+- Manter a base do Vite apenas no `vite.config.ts` (sem passar `--base` ao build).
+- Evitar adicionar Nginx quando FastAPI já serve estáticos de forma simples.
+- Usar a porta única `8000` para expor API e UI.
 
 ## Solução de problemas
 - Porta 8000 ocupada:
-  - Pare quem está usando: `docker stop dtic-dashboard-backend`
-  - Suba novamente: `docker compose -f docker-compose.single.yml up -d`
-- `/dashboard` sem barra final:
-  - Existe redirecionamento para `/dashboard/` no Nginx (`location = /dashboard { return 301 /dashboard/; }`). Use a URL com barra.
+  - Pare o serviço que usa a porta ou execute `docker compose down` antes de subir novamente.
 - Assets não carregam no dashboard:
-  - Garanta rebuild após ajustes de frontend: `docker compose -f docker-compose.single.yml up --build -d`.
-  - O `vite.config.ts` define `base: '/dashboard/'` quando `command === 'build'`.
-- “Failed to fetch” no dev:
-  - Confirme que o backend está em `http://127.0.0.1:8010` e que o proxy do Vite está ativo.
+  - Refaça o build: `docker compose build --no-cache --progress=plain` e `docker compose up -d`.
+- Chamadas tentando `/@vite/client` em produção:
+  - Isso só ocorre no dev; valide que está usando o bundle de produção (sem `vite dev`).
 
 ## Arquivos relevantes
-- `docker-compose.single.yml`: serviço único publicado em `8000` (fluxo oficial).
-- `Dockerfile.single`: build do frontend e runtime backend+Nginx.
-- `frontend/nginx.single.conf`: Nginx servindo `/dashboard/` e proxy de `/api`.
-- `start.sh`: inicializa Uvicorn e Nginx no container.
-- `docker-compose.dev.yml`: modo desenvolvimento com backend+frontend (opcional).
-- `Dockerfile.backend` e `backend/requirements.txt`: dependências do backend.
-- `frontend/vite.config.ts`: base `/dashboard/` no build e proxy dev de `/api/v1`.
+- `docker-compose.yml`: serviço único `manutencao-backend` publicado em `8000`.
+- `Dockerfile`: build do frontend e runtime do backend servindo estáticos.
+- `backend/main.py`: monta `StaticFiles("/dashboard")` e redireciona `/` para `/dashboard/`.
+- `frontend/vite.config.ts`: base `/dashboard/` no build e proxy dev.
 
 ---
-Mantemos foco em simplicidade e clareza: um único container que entrega UI e API, com rotas estáveis e sem sobre-engenharia.
+Operação simples: um container, uma porta, FastAPI entrega UI e API sem Nginx.

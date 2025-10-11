@@ -6,6 +6,8 @@ import logging
 import os
 from pathlib import Path
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -68,3 +70,10 @@ app.include_router(maintenance_tickets_router.router)
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+# Servir frontend estático em /dashboard e redirecionar raiz
+app.mount("/dashboard", StaticFiles(directory="/app/frontend_build", html=True), name="dashboard")
+
+@app.get("/")
+def root_redirect() -> RedirectResponse:
+    return RedirectResponse(url="/dashboard/")

@@ -1,0 +1,11 @@
+services:
+  manutencao-backend:
+    build:
+      context: .
+    container_name: manutencao-backend
+    env_file:
+      - backend/.env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # Logs go to stdout; keep image minimal and simple
