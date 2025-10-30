@@ -72,7 +72,15 @@ def health() -> dict:
     return {"status": "ok"}
 
 # Servir frontend estático em /dashboard e redirecionar raiz
-app.mount("/dashboard", StaticFiles(directory="/app/frontend_build", html=True), name="dashboard")
+try:
+    from pathlib import Path as _Path
+    _frontend_dir = _Path(os.environ.get("FRONTEND_BUILD_DIR", "/app/frontend_build"))
+    if _frontend_dir.exists():
+        app.mount("/dashboard", StaticFiles(directory=str(_frontend_dir), html=True), name="dashboard")
+    else:
+        logging.warning("Frontend build directory '%s' not found; skipping static mount.", str(_frontend_dir))
+except Exception:
+    logging.warning("Failed to mount frontend static files; continuing API-only.")
 
 @app.get("/")
 def root_redirect() -> RedirectResponse:

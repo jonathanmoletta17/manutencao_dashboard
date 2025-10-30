@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from .. import glpi_client
+from ..config import get_api_url, get_app_token, get_user_token
 from ..logic.maintenance_tickets_logic import get_maintenance_new_tickets
 from ..schemas_maintenance import MaintenanceNewTicketItem
 from ..logic.errors import GLPIAuthError, GLPINetworkError, GLPISearchError
@@ -27,9 +28,9 @@ def get_new_tickets(limit: Optional[int] = 10):
     if cached:
         return cached
 
-    API_URL = os.getenv("API_URL") or os.getenv("GLPI_BASE_URL")
-    APP_TOKEN = os.getenv("APP_TOKEN") or os.getenv("GLPI_APP_TOKEN")
-    USER_TOKEN = os.getenv("USER_TOKEN") or os.getenv("GLPI_USER_TOKEN")
+    API_URL = get_api_url()
+    APP_TOKEN = get_app_token()
+    USER_TOKEN = get_user_token()
 
     if not all([API_URL, APP_TOKEN, USER_TOKEN]):
         raise HTTPException(

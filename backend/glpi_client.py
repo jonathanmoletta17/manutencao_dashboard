@@ -14,7 +14,7 @@ Sessão e Cache
 import os
 import time
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Iterator
 
 import requests
 import logging
@@ -22,6 +22,7 @@ import logging
 from .logic.errors import GLPIAuthError, GLPINetworkError, GLPISearchError
 from .utils.glpi_params import build_search_params, mask_sensitive_keys
 from .utils.convert import to_int_zero
+from .config import timeouts_sec, should_change_entity, session_ttl_sec
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 _SESSION_HEADERS: Optional[Dict[str, str]] = None
 _SESSION_TS: float = 0.0
 _SESSION_LOCK = threading.Lock()
-SESSION_TTL_SEC = int(os.environ.get("SESSION_TTL_SEC", "300"))
+SESSION_TTL_SEC = session_ttl_sec()
 
 
 def authenticate(
@@ -68,7 +69,7 @@ def authenticate(
     }
     
     try:
-        response = requests.get(auth_url, headers=headers, timeout=(3, 6))
+        response = requests.get(auth_url, headers=headers, timeout=timeouts_sec())
         response.raise_for_status()
         
         auth_data = response.json()
@@ -86,8 +87,7 @@ def authenticate(
         
         # Determinar se deve trocar entidade ativa
         # change_entity=None => usa env GLPI_CHANGE_ENTITY (default habilitado)
-        change_by_env = os.environ.get("GLPI_CHANGE_ENTITY", "1").strip().lower()
-        change_enabled = (change_entity if change_entity is not None else (change_by_env not in ("0", "false")))
+        change_enabled = (change_entity if change_entity is not None else should_change_entity())
 
         if change_enabled:
             change_entity_url = f"{api_url}/changeActiveEntities"
@@ -95,7 +95,7 @@ def authenticate(
                 'entities_id': 1,
                 'is_recursive': True
             }
-            entity_response = requests.post(change_entity_url, headers=session_headers, json=entity_data, timeout=(3, 6))
+            entity_response = requests.post(change_entity_url, headers=session_headers, json=entity_data, timeout=timeouts_sec())
             entity_response.raise_for_status()
 
         # Atualiza cache de sessão com lock
@@ -111,6 +111,13 @@ def authenticate(
     except requests.exceptions.HTTPError as e:
         status = getattr(e.response, 'status_code', None)
         if status in (401, 403):
+            # Invalida sessão em falha de autenticação
+            try:
+                with _SESSION_LOCK:
+                    _SESSION_HEADERS = None
+                    _SESSION_TS = 0.0
+            except Exception:
+                pass
             raise GLPIAuthError("Falha de autenticação GLPI", status_code=status)
         # Demais erros HTTP na autenticação ou troca de entidade
         raise GLPISearchError(f"Erro HTTP na autenticação/configuração (status={status})", status_code=status)
@@ -169,7 +176,7 @@ def search_paginated(
                 mask_sensitive_keys(current_params),
             )
 
-            response = requests.get(search_url, headers=headers, params=current_params, timeout=(3, 6))
+            response = requests.get(search_url, headers=headers, params=current_params, timeout=timeouts_sec())
             response.raise_for_status()
             
             data = response.json()
@@ -233,7 +240,7 @@ def get_user_names_in_batch_with_fallback(headers: Dict[str, str], api_url: str,
     for user_id in unique_ids:
         try:
             user_url = f"{api_url}/User/{user_id}"
-            response = _requests.get(user_url, headers=headers, timeout=(3, 6))
+            response = _requests.get(user_url, headers=headers, timeout=(1, 2.5))
             response.raise_for_status()
             user_data = response.json()
 
@@ -262,3 +269,74 @@ def get_user_names_in_batch_with_fallback(headers: Dict[str, str], api_url: str,
             names_map[user_id] = f"Usuário ID {user_id} (Dados Incompletos)"
 
     return names_map
+
+
+def search_paginated_iter(
+    headers: Dict[str, str],
+    api_url: str,
+    itemtype: str,
+    criteria: Optional[List[Dict]] = None,
+    forcedisplay: Optional[List[str]] = None,
+    uid_cols: bool = True,
+    range_step: int = 1000,
+    extra_params: Optional[Dict[str, Any]] = None,
+    timeout: Optional[tuple] = None,
+) -> Iterator[Dict[str, Any]]:
+    """
+    Variante geradora de busca paginada que emite cada linha conforme carregada.
+    Útil para reduzir latência percebida em chamadas que processam muitos dados.
+    """
+    search_url = f"{api_url}/search/{itemtype}"
+    start = 0
+
+    params = build_search_params(
+        uid_cols=uid_cols,
+        forcedisplay=forcedisplay,
+        criteria=criteria,
+        extra_params=extra_params,
+    )
+
+    while True:
+        current_params = params.copy()
+        current_params['range'] = f"{start}-{start + range_step - 1}"
+
+        logger.debug(
+            "GLPI search GET %s itemtype=%s params=%s",
+            search_url,
+            itemtype,
+            mask_sensitive_keys(current_params),
+        )
+
+        try:
+            # Usar timeout customizado se fornecido, senão usar padrão
+            request_timeout = timeout if timeout is not None else timeouts_sec()
+            response = requests.get(search_url, headers=headers, params=current_params, timeout=request_timeout)
+            response.raise_for_status()
+            data = response.json()
+            rows = data.get('data') if isinstance(data, dict) else None
+            if not rows:
+                break
+
+            for row in rows:
+                yield row
+
+            totalcount = int(data.get('totalcount', 0) or 0)
+            if (totalcount > 0 and (start + range_step) >= totalcount) or (len(rows) < range_step):
+                break
+
+            start += range_step
+        except requests.exceptions.Timeout:
+            raise GLPINetworkError(f"Timeout na busca paginada de {itemtype}", timeout=True)
+        except requests.exceptions.HTTPError as e:
+            status = getattr(e.response, 'status_code', None)
+            body = ''
+            try:
+                body = getattr(e.response, 'text', '')
+            except Exception:
+                body = ''
+            logger.error("GLPI HTTP error itemtype=%s status=%s body=%s", itemtype, status, body)
+            if status in (401, 403):
+                raise GLPIAuthError("Falha de autenticação GLPI", status_code=status)
+            raise GLPISearchError(f"Erro HTTP na busca paginada de {itemtype} (status={status})", status_code=status)
+        except requests.exceptions.RequestException:
+            raise GLPINetworkError(f"Falha de rede na busca paginada de {itemtype}")

@@ -6,6 +6,7 @@ import os
 
 from fastapi import APIRouter, HTTPException
 from .. import glpi_client
+from ..config import get_api_url, get_app_token, get_user_token
 from ..logic.maintenance_stats_logic import (
     generate_maintenance_stats,
 )
@@ -28,9 +29,9 @@ def get_maintenance_general_stats(inicio: str, fim: str):
     if cached:
         return cached
 
-    API_URL = os.getenv("API_URL") or os.getenv("GLPI_BASE_URL")
-    APP_TOKEN = os.getenv("APP_TOKEN") or os.getenv("GLPI_APP_TOKEN")
-    USER_TOKEN = os.getenv("USER_TOKEN") or os.getenv("GLPI_USER_TOKEN")
+    API_URL = get_api_url()
+    APP_TOKEN = get_app_token()
+    USER_TOKEN = get_user_token()
 
     if not all([API_URL, APP_TOKEN, USER_TOKEN]):
         raise HTTPException(status_code=500, detail="Variáveis de ambiente da API não configuradas.")
@@ -57,7 +58,12 @@ def get_maintenance_general_stats(inicio: str, fim: str):
         raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
     except GLPINetworkError as e:
         logger.error("Erro de rede GLPI: %s", str(e))
-        raise HTTPException(status_code=502, detail="Falha de comunicação com serviço GLPI.")
+        stale = cache.get_stale(cache_key)
+        if stale is not None:
+            logger.warning("Retornando valor stale para stats-gerais devido a erro de rede")
+            return stale
+        status = 504 if getattr(e, 'timeout', False) else 502
+        raise HTTPException(status_code=status, detail="Falha de comunicação com serviço GLPI.")
     except GLPISearchError as e:
         logger.error("Erro de busca GLPI: %s", str(e))
         raise HTTPException(status_code=502, detail="Erro ao buscar dados no GLPI.")

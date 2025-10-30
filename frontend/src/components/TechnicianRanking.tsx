@@ -26,7 +26,9 @@ export function TechnicianRanking({ items, title = 'Ranking de Técnicos' }: Tec
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {!(list && list.length > 0) ? (
+        {items === null ? (
+          <div className="w-full text-center text-xs text-gray-600 py-2">Carregando…</div>
+        ) : !(list && list.length > 0) ? (
           <div className="w-full text-center text-xs text-gray-600 py-2">Ranking indisponível</div>
         ) : (
           <div

@@ -27,6 +27,7 @@ import {
   replaceCategoryModeInUrl,
 } from './services/url_params';
   import { useDashboardData } from './hooks/useDashboardData';
+  import { useTechnicianRanking } from './hooks/useTechnicianRanking';
   import { useCategoryGrouping } from './hooks/useCategoryGrouping';
   import { useCarousel } from './hooks/useCarousel';
   import { fmt, fmtDateTimeParts, fmtTimeOfDay } from './utils/format';
@@ -42,7 +43,8 @@ export default function MaintenanceDashboard() {
 
   // Helpers utilitários
 
-  const { generalStats, entityRanking, categoryRanking, technicianRanking, newTickets, refresh, error } = useDashboardData(dateRange);
+  const { generalStats, entityRanking, categoryRanking, newTickets, refresh, error } = useDashboardData(dateRange);
+  const { items: techItems } = useTechnicianRanking(dateRange);
 
   const applyDateRange = () => {
     replaceUrlParams({ inicio: dateRange.inicio, fim: dateRange.fim });
@@ -363,7 +365,7 @@ export default function MaintenanceDashboard() {
 
         {/* Ranking de Técnicos - largura total abaixo das colunas */}
         <div className="w-full">
-          <TechnicianRanking items={technicianRanking} />
+          <TechnicianRanking items={techItems} />
         </div>
       </div>
     </div>

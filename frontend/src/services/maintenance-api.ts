@@ -98,11 +98,30 @@ export const fetchMaintenanceNewTickets = (limit: number = 10) => {
   return fetchFromAPI<MaintenanceNewTicketItem[]>(`/manutencao/tickets-novos`, { query: { limit } });
 };
 
+// Timeout específico para ranking de técnicos (operação conhecidamente lenta)
+const TECHNICIAN_RANKING_TIMEOUT_MS = 30000; // 30 segundos
+
 // Ranking de Técnicos (por período). Se o endpoint não existir ainda, retorna [] ao invés de falhar.
 export const fetchTechnicianRanking = async (inicio?: string, fim?: string) => {
+  // Implementar timeout específico para evitar ERR_ABORTED do navegador
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TECHNICIAN_RANKING_TIMEOUT_MS);
+  
   try {
-    return await fetchFromAPI<TechnicianRankingItem[]>(`/manutencao/ranking-tecnicos`, { query: { inicio, fim } });
+    const result = await fetchFromAPI<TechnicianRankingItem[]>(`/manutencao/ranking-tecnicos`, { 
+      query: { inicio, fim },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return result;
   } catch (err) {
+    clearTimeout(timeoutId);
+    
+    // Tratar timeout específico
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new APIError('/manutencao/ranking-tecnicos', 'Timeout na busca de ranking de técnicos', 408, 'Request timeout');
+    }
+    
     if (err instanceof APIError && (err.status === 404 || err.status === 501)) {
       // Considera ausência de dados sem quebrar o layout
       return [] as TechnicianRankingItem[];

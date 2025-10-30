@@ -9,6 +9,7 @@ from .glpi_constants import (
     STATUS_NEW, STATUS_ASSIGNED, STATUS_PLANNED, STATUS_PENDING, STATUS_SOLVED, STATUS_CLOSED,
 )
 from .criteria_helpers import add_date_range, add_status
+from ..config import range_step_tickets
 
 
 def generate_maintenance_stats(
@@ -31,15 +32,18 @@ def generate_maintenance_stats(
             fim,
             field=FIELD_CREATED,
         )
-        data = glpi_client.search_paginated(
+        count = 0
+        for _row in glpi_client.search_paginated_iter(
             headers=session_headers,
             api_url=api_url,
             itemtype='Ticket',
             criteria=criteria,
             forcedisplay=[FIELD_ID],
             uid_cols=False,
-        )
-        return len(data)
+            range_step=range_step_tickets(),
+        ):
+            count += 1
+        return count
 
 
     # Em atendimento (status 2 - Atribuído/Em progresso)

@@ -42,6 +42,11 @@ Configuração
   - `GLPI_APP_TOKEN` (ou `APP_TOKEN`)
   - `GLPI_USER_TOKEN` (ou `USER_TOKEN`)
   - `CACHE_TTL_SEC` (opcional, padrão definido no código)
+  - Ajustes de desempenho (opcionais):
+    - `MAX_WORKERS` → número de workers para busca concorrente em ranking de técnicos (padrão: `3`).
+    - `RANGE_STEP_TICKETS` → tamanho do passo de paginação de tickets (padrão: `300`).
+    - `RANGE_STEP_TICKETS_UNASSIGNED` → passo alternativo quando `incluirNaoAtribuido=true`; se ausente, aplica ajuste dinâmico com limite de `1000`.
+    - `EXCLUDE_STATUS_NEW` → se `true`, exclui `STATUS_NEW (1)` no ranking de técnicos, reduzindo paginação.
 
 Critérios de busca
 
